@@ -46,6 +46,7 @@
             transform: translateY(12px);
             pointer-events: none;
             position: absolute;
+            visibility: hidden;
         }
 
         /* Clean Excel Grid Table Styling with Frozen Sr. No., Terminal ID & Top Header (No Shadows) */
@@ -149,10 +150,10 @@
 </head>
 <body class="bg-white min-h-screen w-full flex flex-col items-center justify-center m-0 overflow-x-hidden">
 
-    <!-- ==================== VIEW 1: UPLOAD SCREEN (EXACT REPLICA) ==================== -->
+    <!-- ==================== VIEW 1: UPLOAD SCREEN ==================== -->
     <main id="uploadScreen" class="screen-transition fixed inset-0 w-full h-full bg-white px-6 py-6 flex flex-col items-center justify-between text-center z-10 overflow-y-auto">
         
-        <!-- Top Right Info (i) Icon Positioned Cleanly at Top Right matching other pages -->
+        <!-- Top Right Info (i) Icon -->
         <div class="absolute top-2.5 right-3">
             <button
                 id="openAppInfoBtn"
@@ -328,7 +329,7 @@
         </div>
 
         <!-- Compact Single-Line Notice: Private App, Terms & Conditions & Privacy Policy -->
-        <p class="text-[9.5px] text-[#687076] whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-[380px] mx-auto text-center pb-0.5">
+        <p class="text-[9.5px] text-[#687076] whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-[380px] mx-auto text-center pb-0.5 mt-auto">
             Private app (no misuse) •
             <button type="button" id="bottomTermsLink" class="font-semibold text-[#1E2022] underline underline-offset-2">Terms &amp; Conditions</button>
             &amp;
@@ -337,7 +338,7 @@
 
     </main>
 
-    <!-- ==================== DEDICATED PAGE: INFO (i) SCREEN (SAME HEADER AS EXCEL PAGE, NO BOXES/BORDERS/SHADOWS) ==================== -->
+    <!-- ==================== DEDICATED PAGE: INFO (i) SCREEN ==================== -->
     <section id="appInfoModal" class="screen-transition screen-hidden fixed inset-0 z-50 bg-white flex flex-col w-full h-full">
         <!-- Top Clean White Header Bar with Back Button Only -->
         <header class="bg-white text-[#1E2022] px-3 py-2.5 flex items-center justify-between shrink-0">
@@ -350,13 +351,13 @@
             </div>
         </header>
 
-        <!-- Full Page Scrollable Body (Pure White, No Boxes, No Borders, No Shadows) -->
+        <!-- Full Page Scrollable Body -->
         <div class="flex-1 w-full max-w-md mx-auto px-5 py-3 bg-white overflow-y-auto space-y-5 text-left">
             
-            <!-- Exact Clean App Illustration matching Main Upload Page (No extra box background) -->
+            <!-- Exact Clean App Illustration matching Main Upload Page (Uncropped) -->
             <div class="flex flex-col items-center justify-center pb-2">
-                <div class="w-24 h-24 flex items-center justify-center shrink-0 overflow-hidden mb-1">
-                    <svg viewBox="65 35 230 255" class="w-full h-full scale-125" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <div class="w-24 h-24 flex items-center justify-center shrink-0 mb-1">
+                    <svg viewBox="0 0 360 320" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <clipPath id="infoLogoFlameClip">
                                 <path d="M 225 256 C 194 256 189 229 197 210 C 199 213 203 216 206 218 C 199 205 198 189 203 177 C 207 182 211 187 214 192 C 212 179 214 166 218 158 C 227 195 225 230 225 256 Z" />
@@ -412,7 +413,7 @@
                 <span>Install App on Chrome / Home Screen</span>
             </button>
 
-            <!-- Developer Details (Clean Flat List, No Box/Border) -->
+            <!-- Developer Details -->
             <div class="space-y-1.5 text-xs">
                 <div class="text-[10.5px] font-bold uppercase tracking-wider text-slate-400 mb-1">Developer</div>
                 <div class="flex items-center justify-between py-1">
@@ -445,7 +446,7 @@
                 </div>
             </div>
 
-            <!-- Customer Help Form -> Redirects to WhatsApp (9405173048) (Clean Borderless Inputs) -->
+            <!-- Customer Help Form -> Redirects to WhatsApp (9405173048) -->
             <div class="space-y-2.5 pt-1">
                 <div>
                     <div class="text-xs font-bold text-slate-900">Help &amp; Support</div>
@@ -547,10 +548,10 @@
     <!-- ==================== VIEW 2: FULL EXCEL, BOX & REPORT VIEWER ==================== -->
     <section id="excelScreen" class="screen-transition screen-hidden fixed inset-0 bg-white flex flex-col w-full h-full z-40">
         
-        <!-- Top Clean White Header Bar (No bottom border, no shadows, clean native icons) -->
+        <!-- Top Clean White Header Bar -->
         <header class="bg-white text-[#1E2022] px-3 py-2.5 flex items-center justify-between shrink-0">
             <div class="flex items-center gap-1.5 min-w-0">
-                <!-- Back Button (Returns to Main Sheet if on Report Page, or Upload Screen if on Main Sheet) -->
+                <!-- Back Button -->
                 <button id="backToUploadBtn" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition" title="Back">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -573,9 +574,9 @@
                 </div>
             </div>
 
-            <!-- Right Action Icons: Report Icon / Share Icon + View Switcher (Box/Excel) + Filter Icon -->
+            <!-- Right Action Icons -->
             <div class="flex items-center gap-1 shrink-0">
-                <!-- Report Page Button (Shown in Main View beside Filter/View icons) -->
+                <!-- Report Page Button -->
                 <button id="openReportPageBtn" type="button" class="relative p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Open Submitted Report Page">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -583,7 +584,7 @@
                     <span id="reportCountBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#141414] text-white text-[10px] font-bold rounded-full flex items-center justify-center">0</span>
                 </button>
 
-                <!-- Share Button (Shown on Report Page beside Filter icon) -->
+                <!-- Share Button -->
                 <button id="openShareModalBtn" type="button" class="hidden p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Share Report (PDF, Excel, Copy)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -592,21 +593,19 @@
 
                 <!-- Toggle Box View / Excel View Icon Button -->
                 <button id="toggleViewModeBtn" type="button" class="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Switch Box / Excel View">
-                    <!-- Box View Icon (shown when currently in Excel View) -->
                     <svg id="iconBoxView" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <rect x="3" y="3" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         <rect x="14" y="3" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         <rect x="14" y="14" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         <rect x="3" y="14" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <!-- Excel Table Icon (shown when currently in Box View) -->
                     <svg id="iconExcelView" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M3 15h18M9 3v18"/>
                     </svg>
                 </button>
 
-                <!-- Main Filter Icon (Clean, No Circle Border) -->
+                <!-- Main Filter Icon -->
                 <button id="openMainFilterModalBtn" type="button" class="relative p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Filter Headings, Values & Lock Layout">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -682,13 +681,13 @@
                     <!-- Remark / Input & Submit Section for Report (Pure White Background) -->
                     <div class="bg-white border border-slate-200 rounded-xl p-3">
                         <label for="drawerRemarkInput" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                            Enter Remark / Action Input
+                            Enter Remark/Solution
                         </label>
                         <div class="flex items-center gap-2">
                             <input
                                 type="text"
                                 id="drawerRemarkInput"
-                                placeholder="Type remark or status note..."
+                                placeholder="Type remark or solution..."
                                 class="flex-1 text-xs bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-slate-900 focus:outline-none focus:border-black"
                             />
                             <button
@@ -785,7 +784,7 @@
                         <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold text-xs shrink-0">COPY</div>
                         <div>
                             <div class="text-xs font-bold text-slate-900">Copy Format</div>
-                            <div class="text-[11px] text-slate-500">01 Terminal ID, Location:-, Errors :-, Input</div>
+                            <div class="text-[11px] text-slate-500">01 Terminal ID, Location:-, Errors :-, Remark/Solution :-</div>
                         </div>
                     </button>
                 </div>
@@ -1175,28 +1174,11 @@
             return false;
         }
 
-        function checkExistingSession() {
-            if (loadSessionFromLocalStorage() && currentRows.length > 0) {
-                continueSessionBtn.classList.remove('hidden');
-            }
-        }
-
-        continueSessionBtn.addEventListener('click', () => {
-            if (loadSessionFromLocalStorage()) {
-                updateHeaderForPageMode();
-                uploadScreen.classList.add('screen-hidden');
-                excelScreen.classList.remove('screen-hidden');
-                runWithSkeleton(() => {
-                    renderExcelGrid();
-                }, 180);
-            }
-        });
-
         // ==================== PWA INSTALL & LAUNCHER LOGO ====================
         let deferredInstallPrompt = null;
         function setupPwaAndLauncherLogo() {
             const launcherSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 320" width="512" height="512">
-                <rect width="360" height="320" rx="72" fill="#ffffff"/>
+                <rect width="100%" height="100%" fill="#ffffff"/>
                 <defs>
                     <clipPath id="pwaFlameLeftClip">
                         <path d="M 225 256 C 194 256 189 229 197 210 C 199 213 203 216 206 218 C 199 205 198 189 203 177 C 207 182 211 187 214 192 C 212 179 214 166 218 158 C 227 195 225 230 225 256 Z" />
@@ -1498,7 +1480,7 @@
 
                 const remarkHTML = savedRemark ? `
                     <div class="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-700">
-                        <span class="font-bold text-slate-900">Input:</span> ${savedRemark}
+                        <span class="font-bold text-slate-900">Remark/Solution:</span> ${savedRemark}
                     </div>
                 ` : '';
 
@@ -1813,7 +1795,7 @@
             });
 
             if (isReportPageActive) {
-                theadHTML += `<th class="sheet-header-cell text-left">Input</th>`;
+                theadHTML += `<th class="sheet-header-cell text-left">Remark/Solution</th>`;
             }
 
             theadHTML += '</tr>';
@@ -1884,9 +1866,9 @@
                 const errFormatted = activeErrors.length > 0
                     ? activeErrors.map((e, i) => `${String(i + 1).padStart(2, '0')} ${e.name}`).join(' ')
                     : 'None';
-                const userRemark = getSavedInputForTerminal(tid);
+                const userRemark = getSavedInputForTerminal(tid) || '';
 
-                return `${num} ${tid}\nLocation:- ${loc}\nErrors :- ${errFormatted}\n${userRemark}`;
+                return `${num} ${tid}\nLocation:- ${loc}\nErrors :- ${errFormatted}\nRemark/Solution :- ${userRemark}`;
             });
 
             return blocks.join('\n\n');
@@ -1920,7 +1902,7 @@
             const locIdx = findColIndex("Location");
 
             const exportData = [
-                ["Sr. No.", "Terminal ID", "Location", "Errors", "Input"]
+                ["Sr. No.", "Terminal ID", "Location", "Errors", "Remark/Solution"]
             ];
 
             lastFilteredRows.forEach((row, idx) => {
@@ -1964,7 +1946,7 @@
 
                 docPdf.autoTable({
                     startY: 22,
-                    head: [['Sr.', 'Terminal ID', 'Location', 'Errors', 'Input']],
+                    head: [['Sr.', 'Terminal ID', 'Location', 'Errors', 'Remark/Solution']],
                     body: bodyRows,
                     styles: { fontSize: 8.5, cellPadding: 2.5 },
                     headStyles: { fillColor: [20, 20, 20] }
@@ -2288,6 +2270,19 @@
             excelScreen.classList.add('screen-hidden');
             uploadScreen.classList.remove('screen-hidden');
         });
+
+        // Initialize Session Check on Load
+        function checkExistingSession() {
+            if (loadSessionFromLocalStorage() && currentRows.length > 0) {
+                continueSessionBtn.classList.remove('hidden');
+                
+                // Native persistence: immediately switch directly to the active screen on reload!
+                uploadScreen.classList.add('screen-hidden');
+                excelScreen.classList.remove('screen-hidden');
+                updateHeaderForPageMode();
+                renderExcelGrid();
+            }
+        }
 
         checkExistingSession();
     </script>
