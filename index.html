@@ -591,7 +591,7 @@
         </header>
 
         <!-- Search Bar Container (Slides down smoothly) -->
-        <div id="searchBarContainer" class="search-bar-wrap bg-slate-50 border-slate-200 px-3 w-full shrink-0 flex items-center">
+        <div id="searchBarContainer" class="search-bar-wrap bg-white border-slate-200 px-3 w-full shrink-0 flex items-center">
             <div class="relative w-full">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -1530,7 +1530,7 @@
             if (filteredRows.length === 0) {
                 boxCardsGrid.innerHTML = `
                     <div class="col-span-full py-12 text-center text-sm text-slate-400">
-                        ${isReportPageActive ? 'No submitted ATMs in Report yet. Tap any ATM and click Submit.' : 'No matching ATM records found for the selected filters.'}
+                        ${isReportPageActive ? 'No submitted ATMs in Report yet. Tap any ATM and click Submit.' : 'Result not found 🙈'}
                     </div>
                 `;
                 return;
@@ -2147,7 +2147,7 @@
                 tbodyHTML = `
                     <tr>
                         <td colspan="${totalSpan}" class="py-12 text-center text-xs text-slate-400">
-                            ${q ? 'No records matching your search.' : (isReportPageActive ? 'No submitted ATMs in Report yet.' : 'No matching records found.')}
+                            ${q ? 'Result not found 🙈' : (isReportPageActive ? 'No submitted ATMs in Report yet.' : 'Result not found 🙈')}
                         </td>
                     </tr>
                 `;
