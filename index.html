@@ -166,7 +166,7 @@
             </button>
         </div>
 
-        <!-- Center Content: Illustration + Heading + Subtitle + Upload Button -->
+        <!-- Center Content: Illustration + Heading + Subtitle + Upload Button + Continue Button -->
         <div class="w-full max-w-[380px] flex flex-col items-center my-auto mx-auto">
             <!-- Ultra-Precise Vector Illustration Matching Reference Image 1:1 -->
             <div class="w-[255px] h-[245px] mb-3 flex items-center justify-center">
@@ -284,7 +284,7 @@
         </h1>
 
         <!-- Subtitle -->
-        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-9">
+        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-6">
             Please upload an Excel file (.xlsx, .xls) only.
         </p>
 
@@ -300,17 +300,30 @@
         <button
             type="button"
             onclick="document.getElementById('excelFileInput').click()"
-            class="native-btn w-full max-w-[330px] h-[60px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3.5 px-8 cursor-pointer focus:outline-none"
+            class="native-btn w-full max-w-[330px] h-[56px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3 px-8 cursor-pointer focus:outline-none mb-3"
         >
             <!-- Upload Tray + Up Arrow Icon -->
-            <svg class="w-[24px] h-[24px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="w-[22px] h-[22px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 15V4M12 4L7.5 8.5M12 4L16.5 8.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M4 14.5V17.5C4 18.8807 5.11929 20 6.5 20H17.5C18.8807 20 20 18.8807 20 17.5V14.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span id="btnLabel" class="text-[18px] font-semibold tracking-[-0.01em]">
+            <span id="btnLabel" class="text-[17px] font-semibold tracking-[-0.01em]">
                 Upload Excel File
             </span>
         </button>
+
+        <!-- Continue Button (Appears if active sheet/session exists) -->
+        <button
+            type="button"
+            id="continueSessionBtn"
+            class="hidden native-btn w-full max-w-[330px] h-[50px] bg-slate-100 text-slate-900 border border-slate-200 rounded-full flex items-center justify-center gap-2.5 px-6 font-bold text-sm"
+        >
+            <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+            <span>Continue Existing Session</span>
+        </button>
+
         </div>
 
         <!-- Compact Single-Line Notice: Private App, Terms & Conditions & Privacy Policy -->
@@ -339,10 +352,10 @@
         <!-- Full Page Scrollable Body (Pure White, No Boxes, No Borders, No Shadows) -->
         <div class="flex-1 w-full max-w-md mx-auto px-5 py-3 bg-white overflow-y-auto space-y-5 text-left">
             
-            <!-- Same Upload Page Illustration as Compact App Box Logo -->
+            <!-- Exact Clean App Illustration matching Main Upload Page (No extra box background) -->
             <div class="flex flex-col items-center justify-center pb-2">
-                <div class="w-20 h-20 rounded-[1.25rem] bg-white shadow-sm border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden mb-2.5">
-                    <svg viewBox="65 35 230 255" class="w-full h-full scale-110" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <div class="w-24 h-24 flex items-center justify-center shrink-0 overflow-hidden mb-1">
+                    <svg viewBox="65 35 230 255" class="w-full h-full scale-125" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <clipPath id="infoLogoFlameClip">
                                 <path d="M 225 256 C 194 256 189 229 197 210 C 199 213 203 216 206 218 C 199 205 198 189 203 177 C 207 182 211 187 214 192 C 212 179 214 166 218 158 C 227 195 225 230 225 256 Z" />
@@ -901,12 +914,14 @@
         let activeDrawerRow = null;
         let reportSubmissions = [];
         let isReportPageActive = false;
+        let hasActiveLoadedSession = false;
 
         // DOM Elements
         const uploadScreen = document.getElementById('uploadScreen');
         const excelScreen = document.getElementById('excelScreen');
         const fileInput = document.getElementById('excelFileInput');
         const btnLabel = document.getElementById('btnLabel');
+        const continueSessionBtn = document.getElementById('continueSessionBtn');
         const backToUploadBtn = document.getElementById('backToUploadBtn');
         const sheetFileName = document.getElementById('sheetFileName');
         const sheetRowCount = document.getElementById('sheetRowCount');
@@ -1166,7 +1181,7 @@
 
         setupPwaAndLauncherLogo();
 
-        // ==================== FIREBASE CLOUD PERSISTENCE ====================
+        // ==================== LOCALSTORAGE & CLOUD PERSISTENCE ====================
         let db = null;
         let currentUser = null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-excel-app';
@@ -1202,7 +1217,76 @@
             }, duration);
         }
 
+        function saveLocalState(hasOpenSheet = true) {
+            try {
+                const serializableVF = {};
+                Object.keys(valueFilters).forEach(k => {
+                    serializableVF[k] = Array.from(valueFilters[k]);
+                });
+
+                const payload = {
+                    hasOpenSheet,
+                    headingTitle: currentHeadingTitle,
+                    viewMode: currentViewMode,
+                    isLayoutLocked,
+                    visibleHeadings: Array.from(visibleHeadings),
+                    valueFilters: serializableVF,
+                    headers: currentHeaders,
+                    rows: currentRows.slice(0, 800),
+                    reports: reportSubmissions.slice(0, 400),
+                    updatedAt: Date.now()
+                };
+                localStorage.setItem('monitoring_exel_session', JSON.stringify(payload));
+            } catch (e) {
+                console.warn("Local storage save error:", e);
+            }
+        }
+
+        function loadLocalState() {
+            try {
+                const raw = localStorage.getItem('monitoring_exel_session');
+                if (!raw) return false;
+                const data = JSON.parse(raw);
+                if (data && data.hasOpenSheet && Array.isArray(data.headers) && data.headers.length > 0) {
+                    currentHeaders = data.headers;
+                    currentRows = Array.isArray(data.rows) ? data.rows : [];
+                    currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
+                    currentViewMode = data.viewMode || 'excel';
+                    isLayoutLocked = !!data.isLayoutLocked;
+
+                    if (isLayoutLocked && Array.isArray(data.visibleHeadings)) {
+                        visibleHeadings = new Set(data.visibleHeadings);
+                        visibleHeadings.add("Terminal ID");
+                    } else {
+                        visibleHeadings = new Set(currentHeaders);
+                    }
+
+                    if (data.valueFilters) {
+                        valueFilters = {};
+                        Object.keys(data.valueFilters).forEach(k => {
+                            valueFilters[k] = new Set(data.valueFilters[k]);
+                        });
+                    }
+
+                    if (Array.isArray(data.reports)) {
+                        reportSubmissions = data.reports;
+                        updateReportBadge();
+                    }
+
+                    hasActiveLoadedSession = true;
+                    continueSessionBtn.classList.remove('hidden');
+                    return true;
+                }
+            } catch (e) {
+                console.warn("Local storage load error:", e);
+            }
+            return false;
+        }
+
         async function initCloudStorage() {
+            // First load instantly from localStorage so data never vanishes on refresh
+            loadLocalState();
+
             try {
                 if (typeof __firebase_config === 'undefined' || !__firebase_config) return;
                 const firebaseConfig = JSON.parse(__firebase_config);
@@ -1222,35 +1306,6 @@
                 const snap = await getDoc(stateDocRef);
                 if (snap.exists()) {
                     const data = snap.data();
-                    if (data.isLayoutLocked) {
-                        isLayoutLocked = true;
-                        if (data.visibleHeadingsJson) {
-                            const parsedVis = JSON.parse(data.visibleHeadingsJson);
-                            if (Array.isArray(parsedVis) && parsedVis.length > 0) {
-                                visibleHeadings = new Set(parsedVis);
-                                visibleHeadings.add("Terminal ID");
-                            }
-                        }
-                        if (data.valueFiltersJson) {
-                            const parsedVF = JSON.parse(data.valueFiltersJson);
-                            valueFilters = {};
-                            Object.keys(parsedVF).forEach(k => {
-                                valueFilters[k] = new Set(parsedVF[k]);
-                            });
-                        }
-                    }
-                    if (data.viewMode === 'box' || data.viewMode === 'excel') {
-                        currentViewMode = data.viewMode;
-                        updateViewModeUI();
-                    }
-                    if (data.reportSubmissionsJson) {
-                        const parsedRep = JSON.parse(data.reportSubmissionsJson);
-                        if (Array.isArray(parsedRep)) {
-                            reportSubmissions = parsedRep;
-                            updateReportBadge();
-                        }
-                    }
-
                     if (data.hasOpenSheet && data.headersJson && data.rowsJson) {
                         const savedHeaders = JSON.parse(data.headersJson);
                         const savedRows = JSON.parse(data.rowsJson);
@@ -1258,10 +1313,26 @@
                             currentHeaders = savedHeaders;
                             currentRows = Array.isArray(savedRows) ? savedRows : [];
                             currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
-                            if (!isLayoutLocked) {
+                            isLayoutLocked = !!data.isLayoutLocked;
+                            if (isLayoutLocked && data.visibleHeadingsJson) {
+                                const parsedVis = JSON.parse(data.visibleHeadingsJson);
+                                if (Array.isArray(parsedVis)) {
+                                    visibleHeadings = new Set(parsedVis);
+                                    visibleHeadings.add("Terminal ID");
+                                }
+                            } else {
                                 visibleHeadings = new Set(currentHeaders);
                             }
-                            openExcelViewer(currentHeadingTitle, false);
+                            if (data.reportSubmissionsJson) {
+                                const parsedRep = JSON.parse(data.reportSubmissionsJson);
+                                if (Array.isArray(parsedRep)) {
+                                    reportSubmissions = parsedRep;
+                                    updateReportBadge();
+                                }
+                            }
+                            hasActiveLoadedSession = true;
+                            continueSessionBtn.classList.remove('hidden');
+                            saveLocalState(true);
                         }
                     }
                 }
@@ -1271,6 +1342,7 @@
         }
 
         async function saveStateToCloud(hasOpenSheet = true) {
+            saveLocalState(hasOpenSheet);
             if (!db || !currentUser) return;
             try {
                 const serializableVF = {};
@@ -1298,7 +1370,7 @@
             }
         }
 
-        // Extract only the Date & Time stamp from the uploaded filename (e.g., "09-Nov-2026 05-44 PM")
+        // Extract only the Date & Time stamp from the uploaded filename
         function extractDateTimeHeading(rawFileName) {
             if (!rawFileName) return '09-Nov-2026 05-44 PM';
             const base = rawFileName.replace(/\.[^/.]+$/, "");
@@ -1314,7 +1386,6 @@
             return base.trim();
         }
 
-        // Get active base rows depending on whether user is on Main Sheet or Report Page
         function getBaseDatasetRows() {
             if (isReportPageActive) {
                 return reportSubmissions.map(item => item.row);
@@ -1322,7 +1393,6 @@
             return currentRows;
         }
 
-        // Get unique sorted string values for a specific column index
         function getUniqueColumnValues(colIndex) {
             const set = new Set();
             const baseRows = getBaseDatasetRows();
@@ -1361,7 +1431,6 @@
             return true;
         }
 
-        // Extract active error headings for a specific row (Only the heading names)
         function getActiveErrorsForRow(row) {
             const activeList = [];
             ERROR_COLUMN_NAMES.forEach(errColName => {
@@ -1378,13 +1447,11 @@
             return activeList;
         }
 
-        // Get saved input remark for a Terminal ID if submitted
         function getSavedInputForTerminal(tid) {
             const found = reportSubmissions.find(item => item.terminalId === tid);
             return found ? found.input : '';
         }
 
-        // Switch UI between Excel Table View and Box Card View
         function updateViewModeUI() {
             if (!skeletonContainer.classList.contains('hidden')) return;
             if (currentViewMode === 'box') {
@@ -1408,7 +1475,6 @@
             }, 180);
         });
 
-        // Switch between Main Sheet and Report Page
         function updateHeaderForPageMode() {
             if (isReportPageActive) {
                 sheetFileName.textContent = "Report";
@@ -1430,7 +1496,6 @@
             }, 220);
         });
 
-        // Render Box View Cards (Pure White Background, No Card Shadows, Numbered Error Headings Only: 01, 02...)
         function renderBoxView(filteredRows) {
             const tidIdx = findColIndex("Terminal ID");
             const locIdx = findColIndex("Location");
@@ -1463,7 +1528,6 @@
                 const activeErrors = getActiveErrorsForRow(row);
                 const savedRemark = getSavedInputForTerminal(tid);
 
-                // Display only 01, 02, 03 + Error Heading Name (No extra 'Errors' heading label above it and no timestamp clutter)
                 let errorsHTML = '';
                 if (activeErrors.length > 0) {
                     errorsHTML = `<div class="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5">`;
@@ -1490,7 +1554,6 @@
                 cardsHTML += `
                     <div class="atm-box-card bg-white rounded-xl border border-slate-200 p-3.5 active:scale-[0.99] transition cursor-pointer flex flex-col justify-between" data-row-idx="${rIdx}">
                         <div>
-                            <!-- Top Tags: ONSITE/OFFSITE, Region Name, MS Vendor -->
                             <div class="flex flex-wrap items-center gap-1.5 mb-2">
                                 ${siteType ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase border ${siteBadgeClass}">${siteType}</span>` : ''}
                                 ${region ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white text-slate-700 border border-slate-200 truncate max-w-[140px]">${region}</span>` : ''}
@@ -1498,12 +1561,10 @@
                                 <span class="ml-auto text-[11px] font-bold text-slate-400">#${rIdx + 1}</span>
                             </div>
 
-                            <!-- Terminal ID & Slogan Type Location Below -->
                             <div class="text-[16px] font-extrabold text-slate-900 tracking-tight leading-snug">${tid}</div>
                             <div class="text-xs font-medium text-slate-500 mt-0.5 line-clamp-1">${location}</div>
                         </div>
 
-                        <!-- Numbered Errors List (01, 02, 03...) -->
                         ${errorsHTML}
                         ${remarkHTML}
                     </div>
@@ -1513,7 +1574,6 @@
             boxCardsGrid.innerHTML = cardsHTML;
         }
 
-        // Open 2x2 Bottom Sheet Drawer Smoothly Over Current View (With Pure White Background + Input & Submit)
         function openBoxDetailDrawer(rowIdx) {
             const row = lastFilteredRows[rowIdx];
             if (!row) return;
@@ -1532,7 +1592,6 @@
             drawerStatusPill.textContent = status;
             drawerRemarkInput.value = getSavedInputForTerminal(tid);
 
-            // Populate Active Errors in Drawer (Clean numbered heading names only)
             const activeErrors = getActiveErrorsForRow(row);
             if (activeErrors.length > 0) {
                 drawerErrorsSection.classList.remove('hidden');
@@ -1550,7 +1609,6 @@
                 drawerErrorsList.innerHTML = '';
             }
 
-            // Populate 2x2 Grid with all non-error columns (Pure White cards inside Drawer)
             const errorSet = new Set(ERROR_COLUMN_NAMES.map(e => e.toLowerCase()));
             let gridHTML = '';
 
@@ -1573,7 +1631,6 @@
 
             drawerDetailsGrid.innerHTML = gridHTML;
 
-            // Animate Drawer Smoothly Over Background Without Hiding Current View
             boxDetailDrawer.classList.remove('hidden');
             requestAnimationFrame(() => {
                 boxDrawerBackdrop.classList.remove('opacity-0');
@@ -1594,7 +1651,6 @@
             }, 260);
         }
 
-        // Submit Button inside Bottom Drawer -> Saves ATM + Input into Report Page
         function handleDrawerSubmit() {
             if (!activeDrawerRow) return;
             const tidIdx = findColIndex("Terminal ID");
@@ -1629,7 +1685,6 @@
             }
         });
 
-        // Click on Box Card opens Bottom Drawer
         boxCardsGrid.addEventListener('click', (e) => {
             const card = e.target.closest('.atm-box-card');
             if (!card) return;
@@ -1639,7 +1694,6 @@
             }
         });
 
-        // Click on Excel Table Row also opens Bottom Drawer so user can enter input & submit from Excel view too
         excelTbody.addEventListener('click', (e) => {
             const tr = e.target.closest('tr[data-row-idx]');
             if (!tr) return;
@@ -1652,7 +1706,6 @@
         closeBoxDrawerBtn.addEventListener('click', closeBoxDetailDrawer);
         boxDrawerBackdrop.addEventListener('click', closeBoxDetailDrawer);
 
-        // Render Excel Table (No Per-Heading Filter Icons, No Shadows, Frozen Sr. No., Terminal ID & Top Row)
         function renderExcelGrid() {
             visibleHeadings.add("Terminal ID");
             const baseRows = getBaseDatasetRows();
@@ -1687,7 +1740,6 @@
             lockStatusBadge.classList.toggle('hidden', !isLayoutLocked);
             activeFilterBadge.classList.toggle('hidden', !hasActiveFilters());
 
-            // Build Frozen Top Heading Row (Sr. No. + Visible Headings ONLY, No Per-Heading Filter Icon)
             let theadHTML = '<tr>';
             theadHTML += `<th class="sheet-header-cell sticky-col-sr">Sr. No.</th>`;
 
@@ -1704,7 +1756,6 @@
             theadHTML += '</tr>';
             excelThead.innerHTML = theadHTML;
 
-            // Build Data Rows with Sr. No. 1, 2, 3...
             const tidIdx = findColIndex("Terminal ID");
             let tbodyHTML = '';
 
@@ -1745,7 +1796,6 @@
             updateViewModeUI();
         }
 
-        // ==================== REPORT SHARE OPTIONS (PDF, EXCEL, EXACT COPY FORMAT) ====================
         openShareModalBtn.addEventListener('click', () => {
             shareOptionsModal.classList.remove('hidden');
         });
@@ -1758,11 +1808,6 @@
             }
         });
 
-        // Build Exact Copy Text Format per User Specification:
-        // 01 Terminal ID
-        // Location:- ...
-        // Errors :- 01 ... 02 ...
-        // Input
         function buildExactCopyFormatText() {
             const rowsToShare = lastFilteredRows;
             const tidIdx = findColIndex("Terminal ID");
@@ -1871,7 +1916,6 @@
             shareOptionsModal.classList.add('hidden');
         });
 
-        // ==================== TOP MAIN FILTER POPUP MODAL (HEADINGS + NESTED VALUES + LOCK) ====================
         function openMainFilterModal() {
             draftVisibleHeadings = new Set(visibleHeadings);
             draftValueFilters = {};
@@ -1921,7 +1965,6 @@
                         </div>
                 `;
 
-                // Nested Values Checklist directly underneath the Heading
                 if (isExpanded) {
                     const allValChecked = selectedValsSet.size === allVals.length;
                     html += `
@@ -2057,7 +2100,6 @@
             }, 180);
         });
 
-        // Smoothly transition from Upload screen to Excel Viewer screen with Skeleton effect
         function openExcelViewer(fileNameOrHeading, shouldSave = true) {
             currentHeadingTitle = extractDateTimeHeading(fileNameOrHeading);
             isReportPageActive = false;
@@ -2081,7 +2123,11 @@
             }, 240);
         }
 
-        // Clean parsed Excel sheet: skip any top blank/title rows and remove blank header columns
+        // Continue Button Handler
+        continueSessionBtn.addEventListener('click', () => {
+            openExcelViewer(currentHeadingTitle, false);
+        });
+
         function processUploadedSheetData(rawRows) {
             if (!rawRows || !rawRows.length) return false;
 
@@ -2119,7 +2165,7 @@
             return true;
         }
 
-        // Handle File Upload
+        // Handle New File Upload -> Clears old session data and starts fresh with new file
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
@@ -2135,6 +2181,11 @@
                     const worksheet = workbook.Sheets[firstSheetName];
                     const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
+                    // Clear previous session reports & state for brand new file
+                    reportSubmissions = [];
+                    isLayoutLocked = false;
+                    valueFilters = {};
+
                     const ok = processUploadedSheetData(json);
                     if (!ok) {
                         currentHeaders = [...DEFAULT_HEADERS];
@@ -2146,6 +2197,8 @@
                 }
 
                 setTimeout(() => {
+                    hasActiveLoadedSession = true;
+                    continueSessionBtn.classList.remove('hidden');
                     openExcelViewer(file.name, true);
                     btnLabel.textContent = "Upload Excel File";
                 }, 200);
@@ -2153,7 +2206,6 @@
             reader.readAsArrayBuffer(file);
         });
 
-        // Back button: if on Report Page, return to Main Sheet; if on Main Sheet, return to Upload Screen
         backToUploadBtn.addEventListener('click', () => {
             if (isReportPageActive) {
                 isReportPageActive = false;
@@ -2168,7 +2220,7 @@
             uploadScreen.classList.remove('screen-hidden');
         });
 
-        // Initialize cloud storage on load
+        // Initialize session on load
         initCloudStorage();
     </script>
 </body>
