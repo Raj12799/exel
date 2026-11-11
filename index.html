@@ -714,6 +714,41 @@
             </div>
         </div>
 
+        <!-- Column Header Quick Filter Popup Modal -->
+        <div id="columnFilterModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-white rounded-2xl border border-gray-200 w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
+                    <div>
+                        <h3 id="columnFilterModalTitle" class="text-sm font-bold text-gray-900">Filter Column</h3>
+                        <p class="text-[10.5px] text-gray-500">Select values to display</p>
+                    </div>
+                    <button id="closeColumnFilterModalBtn" type="button" class="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-xs">
+                    <label class="flex items-center gap-2 font-semibold text-gray-800 cursor-pointer">
+                        <input type="checkbox" id="colFilterSelectAllToggle" class="w-4 h-4 rounded border-gray-300 text-black focus:ring-0" checked />
+                        <span>Select All</span>
+                    </label>
+                    <button id="colFilterClearBtn" type="button" class="text-xs font-semibold text-red-600 hover:underline">
+                        Clear Filter
+                    </button>
+                </div>
+                <div id="colFilterValuesList" class="flex-1 bg-white overflow-y-auto p-3 space-y-1"></div>
+                <div class="px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-end gap-2">
+                    <button id="cancelColFilterBtn" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">
+                        Cancel
+                    </button>
+                    <button id="applyColFilterBtn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#141414] text-white hover:bg-gray-800">
+                        Apply Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Share Options Popup Modal (PDF, Excel, Copy Exact Format) -->
         <div id="shareOptionsModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
@@ -912,6 +947,10 @@
         let reportSubmissions = [];
         let isReportPageActive = false;
 
+        // Active Column Filter Modal State
+        let activeColumnFilterHeader = null;
+        let tempColumnFilterValues = new Set();
+
         // DOM Elements
         const uploadScreen = document.getElementById('uploadScreen');
         const excelScreen = document.getElementById('excelScreen');
@@ -948,6 +987,17 @@
         const drawerErrorsSection = document.getElementById('drawerErrorsSection');
         const drawerErrorsList = document.getElementById('drawerErrorsList');
         const drawerDetailsGrid = document.getElementById('drawerDetailsGrid');
+        
+        // Column Filter Modal Elements
+        const columnFilterModal = document.getElementById('columnFilterModal');
+        const columnFilterModalTitle = document.getElementById('columnFilterModalTitle');
+        const closeColumnFilterModalBtn = document.getElementById('closeColumnFilterModalBtn');
+        const cancelColFilterBtn = document.getElementById('cancelColFilterBtn');
+        const applyColFilterBtn = document.getElementById('applyColFilterBtn');
+        const colFilterSelectAllToggle = document.getElementById('colFilterSelectAllToggle');
+        const colFilterClearBtn = document.getElementById('colFilterClearBtn');
+        const colFilterValuesList = document.getElementById('colFilterValuesList');
+
         const shareOptionsModal = document.getElementById('shareOptionsModal');
         const closeShareModalBtn = document.getElementById('closeShareModalBtn');
         const sharePdfBtn = document.getElementById('sharePdfBtn');
@@ -984,7 +1034,6 @@
         const helpMessageInput = document.getElementById('helpMessageInput');
         const installPwaBtn = document.getElementById('installPwaBtn');
 
-        // Track where Legal Page was opened from ('upload' or 'info')
         let legalReturnTarget = 'upload';
 
         function openInfoPage() {
@@ -1074,6 +1123,11 @@
         // ==================== LOCAL STORAGE SESSION PERSISTENCE ====================
         function saveSessionToLocalStorage() {
             try {
+                const serializableVF = {};
+                Object.keys(valueFilters).forEach(k => {
+                    serializableVF[k] = Array.from(valueFilters[k]);
+                });
+
                 const sessionData = {
                     currentHeaders,
                     currentRows: currentRows.slice(0, 800),
@@ -1081,6 +1135,7 @@
                     currentViewMode,
                     isLayoutLocked,
                     visibleHeadings: Array.from(visibleHeadings),
+                    valueFilters: serializableVF,
                     reportSubmissions: reportSubmissions.slice(0, 400),
                     isReportPageActive
                 };
@@ -1102,6 +1157,14 @@
                     currentViewMode = data.viewMode || 'excel';
                     isLayoutLocked = !!data.isLayoutLocked;
                     visibleHeadings = new Set(data.visibleHeadings || DEFAULT_HEADERS);
+                    
+                    if (data.valueFilters) {
+                        valueFilters = {};
+                        Object.keys(data.valueFilters).forEach(k => {
+                            valueFilters[k] = new Set(data.valueFilters[k]);
+                        });
+                    }
+
                     reportSubmissions = Array.isArray(data.reportSubmissions) ? data.reportSubmissions : [];
                     isReportPageActive = !!data.isReportPageActive;
                     return true;
@@ -1112,7 +1175,6 @@
             return false;
         }
 
-        // Check on load if previous session exists
         function checkExistingSession() {
             if (loadSessionFromLocalStorage() && currentRows.length > 0) {
                 continueSessionBtn.classList.remove('hidden');
@@ -1595,6 +1657,104 @@
         closeBoxDrawerBtn.addEventListener('click', closeBoxDetailDrawer);
         boxDrawerBackdrop.addEventListener('click', closeBoxDetailDrawer);
 
+        // ==================== COLUMN HEADER QUICK FILTER MODAL ====================
+        function openColumnFilterModal(hName) {
+            activeColumnFilterHeader = hName;
+            columnFilterModalTitle.textContent = `Filter: ${hName}`;
+            const colIdx = currentHeaders.indexOf(hName);
+            if (colIdx === -1) return;
+
+            const allVals = getUniqueColumnValues(colIdx);
+            const currentFilteredSet = valueFilters[hName];
+            tempColumnFilterValues = currentFilteredSet ? new Set(currentFilteredSet) : new Set(allVals);
+
+            renderColFilterValuesList(allVals);
+            columnFilterModal.classList.remove('hidden');
+        }
+
+        function renderColFilterValuesList(allVals) {
+            colFilterSelectAllToggle.checked = tempColumnFilterValues.size === allVals.length;
+            let html = '';
+            allVals.forEach(v => {
+                const isChecked = tempColumnFilterValues.has(v);
+                const safeV = v.replace(/"/g, '&quot;');
+                html += `
+                    <label class="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-xs text-gray-800">
+                        <input type="checkbox" class="col-val-checkbox w-4 h-4 rounded border-gray-300 text-black focus:ring-0 shrink-0" value="${safeV}" ${isChecked ? 'checked' : ''} />
+                        <span class="truncate">${v}</span>
+                    </label>
+                `;
+            });
+            colFilterValuesList.innerHTML = html;
+        }
+
+        closeColumnFilterModalBtn.addEventListener('click', () => columnFilterModal.classList.add('hidden'));
+        cancelColFilterBtn.addEventListener('click', () => columnFilterModal.classList.add('hidden'));
+
+        colFilterSelectAllToggle.addEventListener('change', () => {
+            const colIdx = currentHeaders.indexOf(activeColumnFilterHeader);
+            if (colIdx === -1) return;
+            const allVals = getUniqueColumnValues(colIdx);
+            if (colFilterSelectAllToggle.checked) {
+                tempColumnFilterValues = new Set(allVals);
+            } else {
+                tempColumnFilterValues.clear();
+            }
+            renderColFilterValuesList(allVals);
+        });
+
+        colFilterClearBtn.addEventListener('click', () => {
+            if (!activeColumnFilterHeader) return;
+            delete valueFilters[activeColumnFilterHeader];
+            columnFilterModal.classList.add('hidden');
+            saveSessionToLocalStorage();
+            renderExcelGrid();
+        });
+
+        colFilterValuesList.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.classList.contains('col-val-checkbox')) {
+                const val = target.value;
+                if (target.checked) {
+                    tempColumnFilterValues.add(val);
+                } else {
+                    tempColumnFilterValues.delete(val);
+                }
+                const colIdx = currentHeaders.indexOf(activeColumnFilterHeader);
+                if (colIdx !== -1) {
+                    const allVals = getUniqueColumnValues(colIdx);
+                    colFilterSelectAllToggle.checked = tempColumnFilterValues.size === allVals.length;
+                }
+            }
+        });
+
+        applyColFilterBtn.addEventListener('click', () => {
+            if (!activeColumnFilterHeader) return;
+            const colIdx = currentHeaders.indexOf(activeColumnFilterHeader);
+            if (colIdx !== -1) {
+                const allVals = getUniqueColumnValues(colIdx);
+                if (tempColumnFilterValues.size === allVals.length) {
+                    delete valueFilters[activeColumnFilterHeader];
+                } else {
+                    valueFilters[activeColumnFilterHeader] = new Set(tempColumnFilterValues);
+                }
+            }
+            columnFilterModal.classList.add('hidden');
+            saveSessionToLocalStorage();
+            renderExcelGrid();
+        });
+
+        // Click on filter icon in table header cell
+        excelThead.addEventListener('click', (e) => {
+            const filterBtn = e.target.closest('.col-header-filter-btn');
+            if (!filterBtn) return;
+            e.stopPropagation();
+            const hName = filterBtn.dataset.header;
+            if (hName) {
+                openColumnFilterModal(hName);
+            }
+        });
+
         function renderExcelGrid() {
             visibleHeadings.add("Terminal ID");
             const baseRows = getBaseDatasetRows();
@@ -1635,7 +1795,21 @@
             visibleCols.forEach(col => {
                 const isTid = col.header.toLowerCase() === 'terminal id';
                 const stickyClass = isTid ? 'sticky-col-tid' : '';
-                theadHTML += `<th class="sheet-header-cell ${stickyClass} text-left">${col.header}</th>`;
+                const isFiltered = valueFilters[col.header] !== undefined;
+                const filterIconColor = isFiltered ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-700';
+
+                theadHTML += `
+                    <th class="sheet-header-cell ${stickyClass} text-left">
+                        <div class="flex items-center justify-between gap-1.5">
+                            <span class="truncate">${col.header}</span>
+                            <button type="button" class="col-header-filter-btn p-1 rounded hover:bg-slate-100 transition shrink-0 ${filterIconColor}" data-header="${col.header.replace(/"/g, '&quot;')}" title="Filter Column">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                `;
             });
 
             if (isReportPageActive) {
@@ -2047,7 +2221,6 @@
             return true;
         }
 
-        // Handle New File Upload
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
@@ -2116,7 +2289,6 @@
             uploadScreen.classList.remove('screen-hidden');
         });
 
-        // Initialize session check on load
         checkExistingSession();
     </script>
 </body>
