@@ -862,6 +862,27 @@
         </div>
     </section>
 
+    <!-- REFRESH CONFIRMATION MODAL -->
+    <div id="refreshConfirmModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-xs p-5 flex flex-col items-center text-center shadow-xl">
+            <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mb-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </div>
+            <h3 id="refreshModalTitle" class="text-base font-bold text-slate-900 mb-1">Restore Session?</h3>
+            <p id="refreshModalDesc" class="text-xs text-slate-500 mb-5">Would you like to continue your previous session work?</p>
+            <div class="grid grid-cols-2 gap-2.5 w-full">
+                <button id="refreshDiscardBtn" type="button" class="native-btn py-2.5 px-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
+                    No, Fresh Start
+                </button>
+                <button id="refreshRestoreBtn" type="button" class="native-btn py-2.5 px-3 rounded-xl bg-[#141414] text-white text-xs font-bold">
+                    Yes, Restore
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden Textarea for Reliable Clipboard Copy -->
     <textarea id="clipboardHelper" class="fixed -top-96 -left-96 opacity-0 pointer-events-none"></textarea>
 
@@ -1057,6 +1078,13 @@
         const helpEmailInput = document.getElementById('helpEmailInput');
         const helpMessageInput = document.getElementById('helpMessageInput');
         const installPwaBtn = document.getElementById('installPwaBtn');
+        
+        // Refresh Confirmation Modal
+        const refreshConfirmModal = document.getElementById('refreshConfirmModal');
+        const refreshModalTitle = document.getElementById('refreshModalTitle');
+        const refreshModalDesc = document.getElementById('refreshModalDesc');
+        const refreshDiscardBtn = document.getElementById('refreshDiscardBtn');
+        const refreshRestoreBtn = document.getElementById('refreshRestoreBtn');
 
         function hideAllScreens() {
             uploadScreen.classList.add('screen-hidden');
@@ -1156,70 +1184,183 @@
             window.open(waUrl, '_blank', 'noopener,noreferrer');
         });
 
-        // ==================== LOCAL STORAGE SESSION PERSISTENCE ====================
-        function saveSessionToLocalStorage() {
-            try {
-                const serializableVF = {};
-                Object.keys(valueFilters).forEach(k => {
-                    serializableVF[k] = Array.from(valueFilters[k]);
-                });
+        // ==================== SESSION PERSISTENCE (IndexedDB + LocalStorage Fallback) ====================
+        const DB_NAME = 'MonitoringExelDB';
+        const STORE_NAME = 'sessionStore';
+        const SESSION_KEY = 'monitoring_exel_session';
 
-                const sessionData = {
-                    currentHeaders,
-                    currentRows: currentRows.slice(0, 800),
-                    currentHeadingTitle,
-                    currentViewMode,
-                    isLayoutLocked,
-                    visibleHeadings: Array.from(visibleHeadings),
-                    valueFilters: serializableVF,
-                    reportSubmissions: reportSubmissions.slice(0, 400),
-                    isReportPageActive,
-                    activePage,
-                    legalReturnTarget,
-                    isShareSelectionLocked,
-                    lockedShareFields
+        function openSessionDB() {
+            return new Promise((resolve, reject) => {
+                if (!window.indexedDB) {
+                    reject(new Error('IndexedDB not supported'));
+                    return;
+                }
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
                 };
-                localStorage.setItem('monitoring_exel_session', JSON.stringify(sessionData));
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function buildSessionPayload(maxRows = null) {
+            const serializableVF = {};
+            Object.keys(valueFilters).forEach(k => {
+                serializableVF[k] = Array.from(valueFilters[k]);
+            });
+
+            return {
+                currentHeaders,
+                currentRows: maxRows ? currentRows.slice(0, maxRows) : currentRows,
+                currentHeadingTitle,
+                currentViewMode,
+                isLayoutLocked,
+                visibleHeadings: Array.from(visibleHeadings),
+                valueFilters: serializableVF,
+                reportSubmissions: maxRows ? reportSubmissions.slice(0, maxRows) : reportSubmissions,
+                isReportPageActive,
+                activePage,
+                legalReturnTarget,
+                isShareSelectionLocked,
+                lockedShareFields
+            };
+        }
+
+        function applyLoadedSessionData(data) {
+            if (data && Array.isArray(data.currentHeaders) && data.currentHeaders.length > 0 && Array.isArray(data.currentRows) && data.currentRows.length > 0) {
+                currentHeaders = data.currentHeaders;
+                currentRows = data.currentRows;
+                currentHeadingTitle = data.currentHeadingTitle || "09-Nov-2026 05-44 PM";
+                currentViewMode = data.currentViewMode || 'excel';
+                isLayoutLocked = !!data.isLayoutLocked;
+                visibleHeadings = new Set(data.visibleHeadings || DEFAULT_HEADERS);
+                
+                if (data.valueFilters) {
+                    valueFilters = {};
+                    Object.keys(data.valueFilters).forEach(k => {
+                        valueFilters[k] = new Set(data.valueFilters[k]);
+                    });
+                }
+
+                reportSubmissions = Array.isArray(data.reportSubmissions) ? data.reportSubmissions : [];
+                isReportPageActive = !!data.isReportPageActive;
+                activePage = data.activePage || 'excel';
+                legalReturnTarget = data.legalReturnTarget || 'upload';
+                isShareSelectionLocked = !!data.isShareSelectionLocked;
+                if (Array.isArray(data.lockedShareFields)) {
+                    lockedShareFields = data.lockedShareFields;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        function saveSessionToLocalStorage() {
+            if (!currentRows || currentRows.length === 0) return;
+
+            const fullPayload = buildSessionPayload();
+
+            // Save full dataset to IndexedDB (handles large Excel files without 5MB quota failure)
+            openSessionDB().then(db => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).put(fullPayload, SESSION_KEY);
+            }).catch(() => {});
+
+            // Also save to localStorage with automatic row-limit fallback if quota exceeded
+            try {
+                localStorage.setItem(SESSION_KEY, JSON.stringify(fullPayload));
             } catch (e) {
-                console.warn("Storage error:", e);
+                try {
+                    const fallbackPayload = buildSessionPayload(300);
+                    localStorage.setItem(SESSION_KEY, JSON.stringify(fallbackPayload));
+                } catch (err) {
+                    console.warn("LocalStorage quota exceeded, using IndexedDB:", err);
+                }
+            }
+
+            if (currentRows.length > 0) {
+                continueSessionBtn.classList.remove('hidden');
             }
         }
 
-        function loadSessionFromLocalStorage() {
+        async function loadSessionAsync() {
+            // Try IndexedDB first for complete un-truncated Excel rows
             try {
-                const raw = localStorage.getItem('monitoring_exel_session');
-                if (!raw) return false;
-                const data = JSON.parse(raw);
-                if (data && Array.isArray(data.currentHeaders) && data.currentHeaders.length > 0) {
-                    currentHeaders = data.currentHeaders;
-                    currentRows = Array.isArray(data.currentRows) ? data.currentRows : [];
-                    currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
-                    currentViewMode = data.viewMode || 'excel';
-                    isLayoutLocked = !!data.isLayoutLocked;
-                    visibleHeadings = new Set(data.visibleHeadings || DEFAULT_HEADERS);
-                    
-                    if (data.valueFilters) {
-                        valueFilters = {};
-                        Object.keys(data.valueFilters).forEach(k => {
-                            valueFilters[k] = new Set(data.valueFilters[k]);
-                        });
-                    }
-
-                    reportSubmissions = Array.isArray(data.reportSubmissions) ? data.reportSubmissions : [];
-                    isReportPageActive = !!data.isReportPageActive;
-                    activePage = data.activePage || 'upload';
-                    legalReturnTarget = data.legalReturnTarget || 'upload';
-                    isShareSelectionLocked = !!data.isShareSelectionLocked;
-                    if (Array.isArray(data.lockedShareFields)) {
-                        lockedShareFields = data.lockedShareFields;
-                    }
+                const db = await openSessionDB();
+                const idbData = await new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const req = tx.objectStore(STORE_NAME).get(SESSION_KEY);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                if (applyLoadedSessionData(idbData)) {
                     return true;
                 }
+            } catch (e) {}
+
+            // Fallback to localStorage
+            try {
+                const raw = localStorage.getItem(SESSION_KEY);
+                if (!raw) return false;
+                const data = JSON.parse(raw);
+                return applyLoadedSessionData(data);
             } catch (e) {
                 console.warn("Load storage error:", e);
             }
             return false;
         }
+
+        function clearSessionLocalStorage() {
+            try {
+                localStorage.removeItem(SESSION_KEY);
+            } catch (e) {}
+            openSessionDB().then(db => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).delete(SESSION_KEY);
+            }).catch(() => {});
+        }
+
+        // ==================== REFRESH CONFIRMATION POPUP ====================
+        let refreshModalMode = 'restore'; // 'restore' on page load, 'reload' when pressing F5/Ctrl+R
+
+        function openRefreshConfirmationPopup(mode) {
+            refreshModalMode = mode;
+            if (mode === 'reload') {
+                refreshModalTitle.textContent = "Refresh Page?";
+                refreshModalDesc.textContent = "Tumhala page refresh karaycha ahe ka?";
+                refreshDiscardBtn.textContent = "No, Cancel";
+                refreshRestoreBtn.textContent = "Yes, Refresh";
+            } else {
+                refreshModalTitle.textContent = "Restore Session?";
+                refreshModalDesc.textContent = "Would you like to continue your previous session work?";
+                refreshDiscardBtn.textContent = "No, Fresh Start";
+                refreshRestoreBtn.textContent = "Yes, Restore";
+            }
+            refreshConfirmModal.classList.remove('hidden');
+        }
+
+        // Intercept keyboard F5 or Ctrl+R / Cmd+R to show custom Refresh Confirmation Popup
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
+                if (currentRows && currentRows.length > 0) {
+                    e.preventDefault();
+                    openRefreshConfirmationPopup('reload');
+                }
+            }
+        });
+
+        // Native browser refresh/close confirmation when session is active
+        window.addEventListener('beforeunload', (e) => {
+            if (currentRows && currentRows.length > 0) {
+                saveSessionToLocalStorage();
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
 
         // ==================== PWA INSTALL & LAUNCHER LOGO ====================
         let deferredInstallPrompt = null;
@@ -1769,7 +1910,6 @@
             let html = '';
             availableFields.forEach(f => {
                 const isChecked = lockedShareFields.includes(f) ? 'checked' : '';
-                const isTid = f === 'Terminal ID'; // Keep TID locked/checked always for context? No let's allow untick if they want.
                 html += `
                     <label class="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer">
                         <input type="checkbox" value="${f.replace(/"/g, '&quot;')}" class="share-field-checkbox w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-0" ${isChecked} />
@@ -2448,7 +2588,6 @@
                     const prevLocked = isLayoutLocked;
                     const prevVisible = new Set(visibleHeadings);
                     
-                    // Capture previous value filters to restore if locked
                     const prevValueFilters = {};
                     Object.keys(valueFilters).forEach(k => prevValueFilters[k] = new Set(valueFilters[k]));
 
@@ -2470,7 +2609,6 @@
                         });
                         visibleHeadings.add("Terminal ID");
                         
-                        // Restore locked value filters
                         valueFilters = {};
                         Object.keys(prevValueFilters).forEach(h => {
                             if (currentHeaders.includes(h)) {
@@ -2495,6 +2633,28 @@
             reader.readAsArrayBuffer(file);
         });
 
+        async function restoreSessionAndOpenViewer() {
+            if (!currentRows || currentRows.length === 0) {
+                await loadSessionAsync();
+            }
+            if (!currentRows || currentRows.length === 0) {
+                showToast("No previous session found");
+                return;
+            }
+            activePage = 'excel';
+            hideAllScreens();
+            excelScreen.classList.remove('screen-hidden');
+            updateHeaderForPageMode();
+            saveSessionToLocalStorage();
+            runWithSkeleton(() => {
+                renderExcelGrid();
+            }, 180);
+        }
+
+        continueSessionBtn.addEventListener('click', () => {
+            restoreSessionAndOpenViewer();
+        });
+
         backToUploadBtn.addEventListener('click', () => {
             if (isReportPageActive) {
                 isReportPageActive = false;
@@ -2509,36 +2669,49 @@
             activePage = 'upload';
             hideAllScreens();
             uploadScreen.classList.remove('screen-hidden');
+            if (currentRows && currentRows.length > 0) {
+                continueSessionBtn.classList.remove('hidden');
+            }
             saveSessionToLocalStorage();
         });
 
-        // Initialize Session Check on Load
-        function checkExistingSession() {
-            if (loadSessionFromLocalStorage()) {
-                if (currentRows.length > 0) {
-                    continueSessionBtn.classList.remove('hidden');
-                }
-                
-                // Hide all screens first
+        // Initialize Session Check on Load with Refresh Confirmation Popup
+        async function checkExistingSession() {
+            const hasData = await loadSessionAsync();
+            if (hasData && currentRows.length > 0) {
+                continueSessionBtn.classList.remove('hidden');
+                openRefreshConfirmationPopup('restore');
+            } else {
                 hideAllScreens();
-                
-                // Route to the exact page the user was on
-                if (activePage === 'excel' && currentRows.length > 0) {
-                    excelScreen.classList.remove('screen-hidden');
-                    updateHeaderForPageMode();
-                    renderExcelGrid();
-                } else if (activePage === 'info') {
-                    appInfoModal.classList.remove('screen-hidden');
-                } else if (activePage === 'terms') {
-                    termsPage.classList.remove('screen-hidden');
-                } else if (activePage === 'privacy') {
-                    privacyPage.classList.remove('screen-hidden');
-                } else {
-                    // Default fallback
-                    uploadScreen.classList.remove('screen-hidden');
-                }
+                uploadScreen.classList.remove('screen-hidden');
             }
         }
+
+        refreshDiscardBtn.addEventListener('click', () => {
+            if (refreshModalMode === 'reload') {
+                // User chose not to refresh page
+                refreshConfirmModal.classList.add('hidden');
+                return;
+            }
+            clearSessionLocalStorage();
+            currentRows = [];
+            reportSubmissions = [];
+            continueSessionBtn.classList.add('hidden');
+            refreshConfirmModal.classList.add('hidden');
+            hideAllScreens();
+            uploadScreen.classList.remove('screen-hidden');
+        });
+
+        refreshRestoreBtn.addEventListener('click', () => {
+            if (refreshModalMode === 'reload') {
+                refreshConfirmModal.classList.add('hidden');
+                saveSessionToLocalStorage();
+                window.location.reload();
+                return;
+            }
+            refreshConfirmModal.classList.add('hidden');
+            restoreSessionAndOpenViewer();
+        });
 
         // Run check on start
         checkExistingSession();
