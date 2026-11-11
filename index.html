@@ -1275,6 +1275,9 @@
 
                     hasActiveLoadedSession = true;
                     continueSessionBtn.classList.remove('hidden');
+
+                    // Automatically restore Excel Viewer directly on refresh without forcing upload screen
+                    openExcelViewer(currentHeadingTitle, false);
                     return true;
                 }
             } catch (e) {
@@ -1284,8 +1287,8 @@
         }
 
         async function initCloudStorage() {
-            // First load instantly from localStorage so data never vanishes on refresh
-            loadLocalState();
+            // First load instantly from localStorage so data and active sheet view persist across refreshes
+            const loadedLocally = loadLocalState();
 
             try {
                 if (typeof __firebase_config === 'undefined' || !__firebase_config) return;
@@ -1309,7 +1312,7 @@
                     if (data.hasOpenSheet && data.headersJson && data.rowsJson) {
                         const savedHeaders = JSON.parse(data.headersJson);
                         const savedRows = JSON.parse(data.rowsJson);
-                        if (Array.isArray(savedHeaders) && savedHeaders.length > 0) {
+                        if (Array.isArray(savedHeaders) && savedHeaders.length > 0 && !loadedLocally) {
                             currentHeaders = savedHeaders;
                             currentRows = Array.isArray(savedRows) ? savedRows : [];
                             currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
@@ -1333,6 +1336,7 @@
                             hasActiveLoadedSession = true;
                             continueSessionBtn.classList.remove('hidden');
                             saveLocalState(true);
+                            openExcelViewer(currentHeadingTitle, false);
                         }
                     }
                 }
@@ -1390,7 +1394,15 @@
             if (isReportPageActive) {
                 return reportSubmissions.map(item => item.row);
             }
-            return currentRows;
+            // Filter out already submitted ATMs from the main list so they don't appear in active view
+            const submittedTids = new Set(reportSubmissions.map(item => item.terminalId));
+            const tidIdx = findColIndex("Terminal ID");
+
+            return currentRows.filter(row => {
+                if (tidIdx === -1) return true;
+                const tid = row[tidIdx] !== undefined && row[tidIdx] !== null ? String(row[tidIdx]).trim() : '';
+                return !submittedTids.has(tid);
+            });
         }
 
         function getUniqueColumnValues(colIndex) {
@@ -2165,7 +2177,7 @@
             return true;
         }
 
-        // Handle New File Upload -> Clears old session data and starts fresh with new file
+        // Handle New File Upload -> Preserves locked layout settings if isLayoutLocked is true
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
@@ -2181,16 +2193,32 @@
                     const worksheet = workbook.Sheets[firstSheetName];
                     const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
-                    // Clear previous session reports & state for brand new file
+                    const prevLocked = isLayoutLocked;
+                    const prevVisible = new Set(visibleHeadings);
+
+                    // Clear previous session reports for brand new file
                     reportSubmissions = [];
-                    isLayoutLocked = false;
-                    valueFilters = {};
 
                     const ok = processUploadedSheetData(json);
                     if (!ok) {
                         currentHeaders = [...DEFAULT_HEADERS];
                         currentRows = [...DEFAULT_ROWS];
                     }
+
+                    if (prevLocked) {
+                        isLayoutLocked = true;
+                        visibleHeadings = new Set();
+                        prevVisible.forEach(h => {
+                            if (currentHeaders.includes(h)) {
+                                visibleHeadings.add(h);
+                            }
+                        });
+                        visibleHeadings.add("Terminal ID");
+                    } else {
+                        visibleHeadings = new Set(currentHeaders);
+                        valueFilters = {};
+                    }
+
                 } catch (err) {
                     currentHeaders = [...DEFAULT_HEADERS];
                     currentRows = [...DEFAULT_ROWS];
