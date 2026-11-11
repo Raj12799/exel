@@ -1,0 +1,2175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="MonitoringExel">
+    <title>Upload Your File</title>
+    <!-- Dynamic PWA Favicon & Apple Touch Icon populated via SVG Launcher Logo -->
+    <link id="dynamicFavicon" rel="icon" type="image/svg+xml" href="">
+    <link id="dynamicAppleIcon" rel="apple-touch-icon" href="">
+    <link id="dynamicManifest" rel="manifest" href="">
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load SheetJS for real .xlsx / .xls parsing & export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Load jsPDF & AutoTable for PDF Report Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <!-- Load Inter Font to match clean native typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            background-color: #ffffff;
+        }
+        /* Native Android button ripple/press feel */
+        .native-btn {
+            transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s ease;
+        }
+        .native-btn:active {
+            transform: scale(0.97);
+            background-color: #262626;
+        }
+
+        /* Smooth Screen Transition */
+        .screen-transition {
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .screen-hidden {
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+            position: absolute;
+        }
+
+        /* Clean Excel Grid Table Styling with Frozen Sr. No., Terminal ID & Top Header (No Shadows) */
+        .excel-grid-container {
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            position: relative;
+            background-color: #ffffff;
+        }
+        .excel-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: auto;
+            width: max-content;
+            min-width: 100%;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 13px;
+            color: #111827;
+            background-color: #ffffff;
+        }
+        .excel-table th,
+        .excel-table td {
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 7px 10px;
+            white-space: nowrap;
+            line-height: 1.25;
+            background-color: #ffffff;
+        }
+        .excel-table tr th:first-child,
+        .excel-table tr td:first-child {
+            border-left: none;
+        }
+        .excel-table thead tr:first-child th {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        /* Frozen Top Heading Row - Pure White & Clean */
+        .sheet-header-cell {
+            background-color: #ffffff !important;
+            font-weight: 700;
+            color: #0f172a;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+
+        /* Frozen Column 1: Sr. No. */
+        .sticky-col-sr {
+            position: sticky;
+            left: 0;
+            width: 54px;
+            min-width: 54px;
+            max-width: 54px;
+            text-align: center;
+            z-index: 12;
+            background-color: #ffffff;
+        }
+        th.sticky-col-sr {
+            z-index: 32 !important;
+            background-color: #ffffff !important;
+        }
+
+        /* Frozen Column 2: Terminal ID (No Shadow, Identical Clean Border) */
+        .sticky-col-tid {
+            position: sticky;
+            left: 54px;
+            min-width: 145px;
+            z-index: 12;
+            background-color: #ffffff;
+        }
+        th.sticky-col-tid {
+            z-index: 32 !important;
+            background-color: #ffffff !important;
+        }
+
+        .excel-table tbody tr:hover td {
+            background-color: #f8fafc !important;
+        }
+
+        /* Smooth Bottom Drawer Animation Over Active View */
+        .bottom-drawer-backdrop {
+            transition: opacity 0.25s ease;
+        }
+        .bottom-drawer-panel {
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        /* Smooth Shimmer Skeleton Effect */
+        @keyframes shimmerPulse {
+            0% { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
+        }
+        .skeleton-block {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 800px 100%;
+            animation: shimmerPulse 1.25s infinite linear;
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen w-full flex flex-col items-center justify-center m-0 overflow-x-hidden">
+
+    <!-- ==================== VIEW 1: UPLOAD SCREEN (EXACT REPLICA) ==================== -->
+    <main id="uploadScreen" class="screen-transition fixed inset-0 w-full h-full bg-white px-6 py-6 flex flex-col items-center justify-between text-center z-10 overflow-y-auto">
+        
+        <!-- Top Right Info (i) Icon Positioned Cleanly at Top Right matching other pages -->
+        <div class="absolute top-2.5 right-3">
+            <button
+                id="openAppInfoBtn"
+                type="button"
+                class="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center focus:outline-none"
+                title="App Info"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Center Content: Illustration + Heading + Subtitle + Upload Button -->
+        <div class="w-full max-w-[380px] flex flex-col items-center my-auto mx-auto">
+            <!-- Ultra-Precise Vector Illustration Matching Reference Image 1:1 -->
+            <div class="w-[255px] h-[245px] mb-3 flex items-center justify-center">
+                <svg viewBox="0 0 360 320" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <!-- Clip Path for Left Half of Campfire Flame (Lavender + Yellow Pattern) -->
+                    <clipPath id="flameLeftPatternClip">
+                        <path d="M 225 256 C 194 256 189 229 197 210 C 199 213 203 216 206 218 C 199 205 198 189 203 177 C 207 182 211 187 214 192 C 212 179 214 166 218 158 C 227 195 225 230 225 256 Z" />
+                    </clipPath>
+                </defs>
+
+                <!-- Ground Shadow & Sketch Lines -->
+                <path d="M 78 273 L 285 273" stroke="#0d0d0d" stroke-width="3.5" stroke-linecap="round"/>
+                <path d="M 92 276 L 265 276" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M 145 280 L 222 280" stroke="#0d0d0d" stroke-width="2" stroke-linecap="round"/>
+
+                <!-- Left Grass Tuft next to Stump -->
+                <path d="M 103 272 L 96 260 M 107 272 L 103 258 M 111 272 L 110 262" stroke="#0d0d0d" stroke-width="2.6" stroke-linecap="round"/>
+
+                <!-- Tree Stump Seat -->
+                <path d="M 112 204 L 112 272" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <!-- Cut Branch Stub on Left of Stump -->
+                <path d="M 112 227 L 95 235 C 90 237 89 242 95 242 L 112 238" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 105 225 L 101 219" stroke="#0d0d0d" stroke-width="3" stroke-linecap="round"/>
+                <!-- Stump Vertical Bark Marks -->
+                <path d="M 115 256 L 115 270 M 120 261 L 120 271" stroke="#0d0d0d" stroke-width="2.2" stroke-linecap="round"/>
+
+                <!-- Yeti Main White Body Fill -->
+                <path d="M 150 56 C 136 58 134 72 133 88 C 132 101 124 105 111 111 C 96 117 94 132 96 154 C 98 176 96 196 114 205 C 122 209 131 209 139 207 L 139 240 L 194 240 L 192 178 L 180 151 L 173 94 C 170 74 166 55 150 56 Z" fill="#ffffff"/>
+
+                <!-- Yeti Messy Hair Tuft on Crown -->
+                <path d="M 150 55 C 154 47 159 43 162 43 C 159 48 157 52 157 55 C 162 50 166 49 168 51 C 164 54 160 56 157 57" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+
+                <!-- Yeti Head, Shoulder & Back Curve -->
+                <path d="M 150 56 C 136 58 134 72 133 88 C 132 101 124 105 111 111 C 96 117 94 132 96 154 C 98 176 96 197 115 205 C 125 209 133 208 139 205" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <!-- Yeti Right Head/Neck Side -->
+                <path d="M 158 56 C 168 58 172 72 175 91 C 177 106 179 122 181 134" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+
+                <!-- Yeti Heart-Shaped Monkey Face Framing -->
+                <path d="M 151 73 C 146 70 139 73 140 82 C 140 89 146 93 149 101 C 151 108 156 112 160 110 C 164 108 165 98 163 90 C 162 85 167 80 164 73 C 161 68 154 70 151 75 C 151 74 151 73 151 73 Z" stroke="#0d0d0d" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Yeti Eyes & Brow Wrinkle -->
+                <path d="M 148 79 L 148 83" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M 155 78 L 155 82" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M 149 75 L 153 75" stroke="#0d0d0d" stroke-width="2" stroke-linecap="round"/>
+                <!-- Yeti Open Laughing Mouth & Tongue -->
+                <path d="M 151 87 C 151 95 154 103 157 103 C 160 103 160 94 158 87 Z" stroke="#0d0d0d" stroke-width="2.6" stroke-linejoin="round"/>
+                <path d="M 154 92 C 156 91 157 92 158 94" stroke="#0d0d0d" stroke-width="2.2" stroke-linecap="round"/>
+
+                <!-- Yeti Left Arm Raised Giving Thumbs Up -->
+                <path d="M 181 134 C 185 123 190 105 193 90 C 195 81 200 82 200 90 C 200 97 198 104 197 108" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Curled Fingers on Thumbs Up Hand -->
+                <path d="M 198 101 C 206 100 209 105 203 109 C 210 109 211 115 204 118 C 210 119 210 125 203 127 C 207 129 205 134 198 135 C 194 135 190 134 188 132" stroke="#0d0d0d" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Palm Crease & Lower Forearm Curve -->
+                <path d="M 194 109 C 197 113 197 119 194 123" stroke="#0d0d0d" stroke-width="2.6" stroke-linecap="round"/>
+                <path d="M 198 135 C 195 148 189 156 181 154" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+
+                <!-- Yeti Right Arm & Hand Holding Stick -->
+                <path d="M 124 136 C 138 140 152 140 164 144 C 171 146 175 153 172 158 C 169 162 165 161 163 158 C 161 163 156 163 154 159 C 151 163 146 162 145 158 C 135 160 120 165 109 158" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Elbow Fur Lines -->
+                <path d="M 112 152 L 116 157 M 116 151 L 120 156" stroke="#0d0d0d" stroke-width="2.5" stroke-linecap="round"/>
+
+                <!-- Yeti Legs & Shins -->
+                <path d="M 140 183 C 141 200 141 220 141 239" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <path d="M 168 181 C 169 200 169 220 169 239" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <path d="M 173 164 C 189 172 193 195 192 237" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <!-- Fur Hatching Marks Above Both Ankles -->
+                <path d="M 145 237 L 145 243 M 151 238 L 151 244 M 158 237 L 158 243 M 163 238 L 163 243" stroke="#0d0d0d" stroke-width="2.6" stroke-linecap="round"/>
+                <path d="M 176 236 L 176 242 M 182 236 L 182 242 M 187 236 L 187 242" stroke="#0d0d0d" stroke-width="2.6" stroke-linecap="round"/>
+
+                <!-- Yeti Left Foot (4 Toes) -->
+                <path d="M 141 243 C 135 247 135 255 142 256 C 139 262 145 267 151 263 C 153 268 161 268 163 262 C 168 265 174 260 171 253 C 170 249 169 244 168 241" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Yeti Right Foot (Toes Turned Sideways) -->
+                <path d="M 171 251 C 174 259 180 263 184 259 C 186 264 193 264 194 258 C 200 260 205 254 199 249 C 203 245 200 239 193 239" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Gap Between Feet -->
+                <path d="M 164 265 L 164 272 M 183 263 L 183 272" stroke="#0d0d0d" stroke-width="3.2" stroke-linecap="round"/>
+
+                <!-- Roasting Skewer Stick & Marshmallow -->
+                <path d="M 172 151 L 216 146" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                <!-- Marshmallow Cylinder (With left end perspective oval) -->
+                <path d="M 218 139 C 221 139 223 143 223 147 C 223 151 221 155 218 155 C 215 155 213 151 213 147 C 213 143 215 139 218 139 Z" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2"/>
+                <path d="M 218 139 L 239 139 C 243 139 245 143 245 147 C 245 151 243 155 239 155 L 218 155" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Skewer Tip Sticking Out Right Side of Marshmallow -->
+                <path d="M 245 147 L 253 146" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                <!-- Heat / Sizzle Marks Around Marshmallow -->
+                <path d="M 236 128 L 236 122 M 244 130 L 247 124" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M 210 161 L 205 166 M 217 163 L 214 170" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+
+                <!-- Campfire Dual-Tone Flame -->
+                <!-- Right Half: Vibrant Orange-Red Flame -->
+                <path d="M 225 256 C 225 230 227 195 218 158 C 231 169 239 187 240 202 C 244 196 249 191 251 187 C 254 198 253 209 250 218 C 255 214 259 213 261 211 C 266 229 258 252 225 256 Z" fill="#FF521B"/>
+
+                <!-- Left Half: Lavender Base with Golden-Yellow Abstract Shapes Inside Clip -->
+                <g clip-path="url(#flameLeftPatternClip)">
+                    <rect x="185" y="155" width="50" height="105" fill="#C8A4F8"/>
+                    <!-- Golden Yellow Organic Blobs Matching Reference Flame -->
+                    <path d="M 192 212 C 204 209 212 215 211 225 C 210 234 198 235 192 228 Z" fill="#FDBA31"/>
+                    <path d="M 215 178 C 224 182 228 196 222 206 C 216 214 210 202 215 178 Z" fill="#FDBA31"/>
+                    <path d="M 204 242 C 208 233 216 233 218 242 C 220 250 210 256 204 248 Z" fill="#FDBA31"/>
+                    <path d="M 220 220 C 226 218 230 225 227 233 C 224 239 218 232 220 220 Z" fill="#FDBA31"/>
+                    <path d="M 196 190 C 203 192 207 198 203 203 C 199 207 193 200 196 190 Z" fill="#FDBA31"/>
+                </g>
+
+                <!-- Campfire Wood Log Below Flame -->
+                <path d="M 212 252 L 260 252 C 267 252 271 258 271 263 C 271 268 267 272 260 272 L 212 272" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Left Cut Circular Face of Log -->
+                <ellipse cx="212" cy="262" rx="6.5" ry="10" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4"/>
+                <!-- Wood Grain Lines on Log -->
+                <path d="M 227 258 L 254 258 M 235 263 L 261 263 M 224 267 L 245 267" stroke="#0d0d0d" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+        </div>
+
+        <!-- Main Heading -->
+        <h1 class="text-[28px] font-bold text-[#1E2022] tracking-[-0.02em] leading-snug mb-2">
+            Upload Your File
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-9">
+            Please upload an Excel file (.xlsx, .xls) only.
+        </p>
+
+        <!-- Hidden Native File Input -->
+        <input
+            type="file"
+            id="excelFileInput"
+            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            class="hidden"
+        />
+
+        <!-- Pill-Shaped Upload Button -->
+        <button
+            type="button"
+            onclick="document.getElementById('excelFileInput').click()"
+            class="native-btn w-full max-w-[330px] h-[60px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3.5 px-8 cursor-pointer focus:outline-none"
+        >
+            <!-- Upload Tray + Up Arrow Icon -->
+            <svg class="w-[24px] h-[24px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 15V4M12 4L7.5 8.5M12 4L16.5 8.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 14.5V17.5C4 18.8807 5.11929 20 6.5 20H17.5C18.8807 20 20 18.8807 20 17.5V14.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span id="btnLabel" class="text-[18px] font-semibold tracking-[-0.01em]">
+                Upload Excel File
+            </span>
+        </button>
+        </div>
+
+        <!-- Compact Single-Line Notice: Private App, Terms & Conditions & Privacy Policy -->
+        <p class="text-[9.5px] text-[#687076] whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-[380px] mx-auto text-center pb-0.5">
+            Private app (no misuse) •
+            <button type="button" id="bottomTermsLink" class="font-semibold text-[#1E2022] underline underline-offset-2">Terms &amp; Conditions</button>
+            &amp;
+            <button type="button" id="bottomPrivacyLink" class="font-semibold text-[#1E2022] underline underline-offset-2">Privacy Policy</button>
+        </p>
+
+    </main>
+
+    <!-- ==================== DEDICATED PAGE: INFO (i) SCREEN (SAME HEADER AS EXCEL PAGE, NO BOXES/BORDERS/SHADOWS) ==================== -->
+    <section id="appInfoModal" class="screen-transition screen-hidden fixed inset-0 z-50 bg-white flex flex-col w-full h-full">
+        <!-- Top Clean White Header Bar with Back Button Only -->
+        <header class="bg-white text-[#1E2022] px-3 py-2.5 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-1.5 min-w-0">
+                <button id="closeAppInfoBtn" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition" title="Back">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Full Page Scrollable Body (Pure White, No Boxes, No Borders, No Shadows) -->
+        <div class="flex-1 w-full max-w-md mx-auto px-5 py-3 bg-white overflow-y-auto space-y-5 text-left">
+            
+            <!-- Same Upload Page Illustration as Compact App Box Logo -->
+            <div class="flex flex-col items-center justify-center pb-2">
+                <div class="w-20 h-20 rounded-[1.25rem] bg-white shadow-sm border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden mb-2.5">
+                    <svg viewBox="65 35 230 255" class="w-full h-full scale-110" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <clipPath id="infoLogoFlameClip">
+                                <path d="M 225 256 C 194 256 189 229 197 210 C 199 213 203 216 206 218 C 199 205 198 189 203 177 C 207 182 211 187 214 192 C 212 179 214 166 218 158 C 227 195 225 230 225 256 Z" />
+                            </clipPath>
+                        </defs>
+                        <path d="M 78 273 L 285 273" stroke="#0d0d0d" stroke-width="3.5" stroke-linecap="round"/>
+                        <path d="M 92 276 L 265 276" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                        <path d="M 103 272 L 96 260 M 107 272 L 103 258 M 111 272 L 110 262" stroke="#0d0d0d" stroke-width="2.6" stroke-linecap="round"/>
+                        <path d="M 112 204 L 112 272" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                        <path d="M 112 227 L 95 235 C 90 237 89 242 95 242 L 112 238" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 150 56 C 136 58 134 72 133 88 C 132 101 124 105 111 111 C 96 117 94 132 96 154 C 98 176 96 196 114 205 C 122 209 131 209 139 207 L 139 240 L 194 240 L 192 178 L 180 151 L 173 94 C 170 74 166 55 150 56 Z" fill="#ffffff"/>
+                        <path d="M 150 55 C 154 47 159 43 162 43 C 159 48 157 52 157 55 C 162 50 166 49 168 51 C 164 54 160 56 157 57" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 150 56 C 136 58 134 72 133 88 C 132 101 124 105 111 111 C 96 117 94 132 96 154 C 98 176 96 197 115 205 C 125 209 133 208 139 205" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                        <path d="M 158 56 C 168 58 172 72 175 91 C 177 106 179 122 181 134" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                        <path d="M 151 73 C 146 70 139 73 140 82 C 140 89 146 93 149 101 C 151 108 156 112 160 110 C 164 108 165 98 163 90 C 162 85 167 80 164 73 C 161 68 154 70 151 75 Z" stroke="#0d0d0d" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 148 79 L 148 83 M 155 78 L 155 82" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                        <path d="M 151 87 C 151 95 154 103 157 103 C 160 103 160 94 158 87 Z" stroke="#0d0d0d" stroke-width="2.6" stroke-linejoin="round"/>
+                        <path d="M 181 134 C 185 123 190 105 193 90 C 195 81 200 82 200 90 C 200 97 198 104 197 108" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 198 101 C 206 100 209 105 203 109 C 210 109 211 115 204 118 C 210 119 210 125 203 127 C 207 129 205 134 198 135 C 194 135 190 134 188 132" stroke="#0d0d0d" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 198 135 C 195 148 189 156 181 154" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                        <path d="M 124 136 C 138 140 152 140 164 144 C 171 146 175 153 172 158 C 169 162 165 161 163 158 C 161 163 156 163 154 159 C 151 163 146 162 145 158 C 135 160 120 165 109 158" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 140 183 C 141 200 141 220 141 239 M 168 181 C 169 200 169 220 169 239 M 173 164 C 189 172 193 195 192 237" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                        <path d="M 141 243 C 135 247 135 255 142 256 C 139 262 145 267 151 263 C 153 268 161 268 163 262 C 168 265 174 260 171 253 C 170 249 169 244 168 241" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 171 251 C 174 259 180 263 184 259 C 186 264 193 264 194 258 C 200 260 205 254 199 249 C 203 245 200 239 193 239" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 172 151 L 216 146" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                        <path d="M 218 139 C 221 139 223 143 223 147 C 223 151 221 155 218 155 C 215 155 213 151 213 147 C 213 143 215 139 218 139 Z" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2"/>
+                        <path d="M 218 139 L 239 139 C 243 139 245 143 245 147 C 245 151 243 155 239 155 L 218 155" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M 245 147 L 253 146" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                        <path d="M 225 256 C 225 230 227 195 218 158 C 231 169 239 187 240 202 C 244 196 249 191 251 187 C 254 198 253 209 250 218 C 255 214 259 213 261 211 C 266 229 258 252 225 256 Z" fill="#FF521B"/>
+                        <g clip-path="url(#infoLogoFlameClip)">
+                            <rect x="185" y="155" width="50" height="105" fill="#C8A4F8"/>
+                            <path d="M 192 212 C 204 209 212 215 211 225 C 210 234 198 235 192 228 Z" fill="#FDBA31"/>
+                            <path d="M 215 178 C 224 182 228 196 222 206 C 216 214 210 202 215 178 Z" fill="#FDBA31"/>
+                            <path d="M 204 242 C 208 233 216 233 218 242 C 220 250 210 256 204 248 Z" fill="#FDBA31"/>
+                        </g>
+                        <path d="M 212 252 L 260 252 C 267 252 271 258 271 263 C 271 268 267 272 260 272 L 212 272" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <ellipse cx="212" cy="262" rx="6.5" ry="10" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4"/>
+                    </svg>
+                </div>
+                <h3 class="text-[16px] font-bold text-slate-900 text-center leading-tight">MonitoringExel</h3>
+                <p class="text-[11px] text-slate-500 text-center mt-0.5">Version 001</p>
+            </div>
+
+            <!-- Chrome PWA Install Button -->
+            <button
+                id="installPwaBtn"
+                type="button"
+                class="hidden w-full py-2.5 px-3.5 rounded-full bg-[#141414] text-white text-xs font-bold flex items-center justify-center gap-2 native-btn"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 18h16"/>
+                </svg>
+                <span>Install App on Chrome / Home Screen</span>
+            </button>
+
+            <!-- Developer Details (Clean Flat List, No Box/Border) -->
+            <div class="space-y-1.5 text-xs">
+                <div class="text-[10.5px] font-bold uppercase tracking-wider text-slate-400 mb-1">Developer</div>
+                <div class="flex items-center justify-between py-1">
+                    <span class="text-slate-500">Name</span>
+                    <span class="font-bold text-slate-900">Kamlesh Suryavanshi</span>
+                </div>
+                <div class="flex items-center justify-between py-1">
+                    <span class="text-slate-500">Contact</span>
+                    <a href="tel:9405173048" class="font-bold text-slate-900 underline underline-offset-2">9405173048</a>
+                </div>
+                <div class="flex items-center justify-between py-1">
+                    <span class="text-slate-500">Email</span>
+                    <a href="mailto:kamleshsuryawanshi50@gmail.com" class="font-bold text-slate-900 underline underline-offset-2 truncate max-w-[215px]">kamleshsuryawanshi50@gmail.com</a>
+                </div>
+                <div class="flex items-center gap-3 pt-3">
+                    <button
+                        id="infoTermsBtn"
+                        type="button"
+                        class="flex-1 native-btn py-2.5 px-2 rounded-xl bg-slate-50 text-slate-800 text-[11px] font-bold text-center border border-slate-200"
+                    >
+                        Terms &amp; Conditions
+                    </button>
+                    <button
+                        id="infoPrivacyBtn"
+                        type="button"
+                        class="flex-1 native-btn py-2.5 px-2 rounded-xl bg-slate-50 text-slate-800 text-[11px] font-bold text-center border border-slate-200"
+                    >
+                        Privacy Policy
+                    </button>
+                </div>
+            </div>
+
+            <!-- Customer Help Form -> Redirects to WhatsApp (9405173048) (Clean Borderless Inputs) -->
+            <div class="space-y-2.5 pt-1">
+                <div>
+                    <div class="text-xs font-bold text-slate-900">Help &amp; Support</div>
+                    <p class="text-[11px] text-slate-500">Submit your details to connect on WhatsApp</p>
+                </div>
+                <form id="whatsappHelpForm" class="space-y-2.5">
+                    <input
+                        type="text"
+                        id="helpNameInput"
+                        required
+                        placeholder="Your Name *"
+                        class="w-full text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-slate-100"
+                    />
+                    <input
+                        type="tel"
+                        id="helpContactInput"
+                        required
+                        placeholder="Contact Number *"
+                        class="w-full text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-slate-100"
+                    />
+                    <input
+                        type="email"
+                        id="helpEmailInput"
+                        required
+                        placeholder="Email ID *"
+                        class="w-full text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-slate-100"
+                    />
+                    <input
+                        type="text"
+                        id="helpMessageInput"
+                        placeholder="Help / Issue Note (Optional)"
+                        class="w-full text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-slate-100"
+                    />
+                    <button
+                        type="submit"
+                        class="native-btn w-full py-3 px-4 rounded-full bg-[#141414] text-white text-xs font-bold flex items-center justify-center gap-2"
+                    >
+                        <span>Submit on WhatsApp</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== DEDICATED PAGE: TERMS & CONDITIONS SCREEN ==================== -->
+    <section id="termsPage" class="screen-transition screen-hidden fixed inset-0 z-50 bg-white flex flex-col w-full h-full">
+        <header class="bg-white text-[#1E2022] px-3 py-2.5 flex items-center gap-1.5 shrink-0">
+            <button id="backFromTermsBtn" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition" title="Back">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <div class="text-left">
+                <h3 class="text-[15.5px] font-bold text-slate-900 leading-tight">Terms &amp; Conditions</h3>
+                <p class="text-[11px] text-slate-500 leading-tight">Version 001</p>
+            </div>
+        </header>
+        <div class="flex-1 w-full max-w-md mx-auto px-5 py-3 bg-white overflow-y-auto space-y-3 text-left text-xs text-slate-700 leading-relaxed">
+            <div class="space-y-2.5">
+                <div class="text-sm font-bold text-slate-900">1. Private &amp; Authorized Use Only</div>
+                <p>This application (Version 001) is a private, simple utility built strictly for authorized internal and operational workflows. Unauthorized use or misuse of this application is strictly prohibited.</p>
+
+                <div class="text-sm font-bold text-slate-900 pt-1">2. Proper Handling of Data</div>
+                <p>Users must only upload valid operational Excel files (<code>.xlsx</code>, <code>.xls</code>) that they are permitted to access. Sharing or distributing sensitive ATM status records to unauthorized persons is not allowed.</p>
+
+                <div class="text-sm font-bold text-slate-900 pt-1">3. Developer &amp; Ownership</div>
+                <p>Developed &amp; maintained by <strong>Kamlesh Suryavanshi</strong> (Contact: <strong>9405173048</strong>, Email: <strong>kamleshsuryawanshi50@gmail.com</strong>).</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== DEDICATED PAGE: PRIVACY POLICY SCREEN ==================== -->
+    <section id="privacyPage" class="screen-transition screen-hidden fixed inset-0 z-50 bg-white flex flex-col w-full h-full">
+        <header class="bg-white text-[#1E2022] px-3 py-2.5 flex items-center gap-1.5 shrink-0">
+            <button id="backFromPrivacyBtn" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition" title="Back">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <div class="text-left">
+                <h3 class="text-[15.5px] font-bold text-slate-900 leading-tight">Privacy Policy</h3>
+                <p class="text-[11px] text-slate-500 leading-tight">Version 001</p>
+            </div>
+        </header>
+        <div class="flex-1 w-full max-w-md mx-auto px-5 py-3 bg-white overflow-y-auto space-y-3 text-left text-xs text-slate-700 leading-relaxed">
+            <div class="space-y-2.5">
+                <div class="text-sm font-bold text-slate-900">1. Local &amp; Secure Processing</div>
+                <p>Your uploaded Excel spreadsheets (<code>.xlsx</code>, <code>.xls</code>) and ATM status reports are processed directly within your browser session for viewing, filtering, and exporting reports.</p>
+
+                <div class="text-sm font-bold text-slate-900 pt-1">2. No Third-Party Sharing</div>
+                <p>We respect your privacy. Your uploaded operational files, remarks, and generated reports are strictly private and are never sold or shared with any unauthorized third party.</p>
+
+                <div class="text-sm font-bold text-slate-900 pt-1">3. Support &amp; Contact</div>
+                <p>For any privacy or support queries, reach out to <strong>Kamlesh Suryavanshi</strong> at <strong>9405173048</strong> or <strong>kamleshsuryawanshi50@gmail.com</strong>.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== VIEW 2: FULL EXCEL, BOX & REPORT VIEWER ==================== -->
+    <section id="excelScreen" class="screen-transition screen-hidden fixed inset-0 bg-white flex flex-col w-full h-full z-40">
+        
+        <!-- Top Clean White Header Bar (No bottom border, no shadows, clean native icons) -->
+        <header class="bg-white text-[#1E2022] px-3 py-2.5 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-1.5 min-w-0">
+                <!-- Back Button (Returns to Main Sheet if on Report Page, or Upload Screen if on Main Sheet) -->
+                <button id="backToUploadBtn" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition" title="Back">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <!-- Extracted File Date-Time Heading or Report Heading -->
+                <div class="truncate">
+                    <div class="flex items-center gap-1.5">
+                        <h2 id="sheetFileName" class="text-[15.5px] font-bold text-slate-900 leading-tight truncate">
+                            09-Nov-2026 05-44 PM
+                        </h2>
+                        <span id="lockStatusBadge" class="hidden inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                            <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                            Locked
+                        </span>
+                    </div>
+                    <p id="sheetRowCount" class="text-[11px] text-slate-500 leading-tight">
+                        Showing records
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Action Icons: Report Icon / Share Icon + View Switcher (Box/Excel) + Filter Icon -->
+            <div class="flex items-center gap-1 shrink-0">
+                <!-- Report Page Button (Shown in Main View beside Filter/View icons) -->
+                <button id="openReportPageBtn" type="button" class="relative p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Open Submitted Report Page">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span id="reportCountBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#141414] text-white text-[10px] font-bold rounded-full flex items-center justify-center">0</span>
+                </button>
+
+                <!-- Share Button (Shown on Report Page beside Filter icon) -->
+                <button id="openShareModalBtn" type="button" class="hidden p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Share Report (PDF, Excel, Copy)">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
+
+                <!-- Toggle Box View / Excel View Icon Button -->
+                <button id="toggleViewModeBtn" type="button" class="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Switch Box / Excel View">
+                    <!-- Box View Icon (shown when currently in Excel View) -->
+                    <svg id="iconBoxView" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <!-- Excel Table Icon (shown when currently in Box View) -->
+                    <svg id="iconExcelView" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M3 15h18M9 3v18"/>
+                    </svg>
+                </button>
+
+                <!-- Main Filter Icon (Clean, No Circle Border) -->
+                <button id="openMainFilterModalBtn" type="button" class="relative p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Filter Headings, Values & Lock Layout">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    <span id="activeFilterBadge" class="hidden absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- SKELETON LOADING OVERLAY (Smooth Shimmer Effect) -->
+        <div id="skeletonContainer" class="hidden flex-1 w-full bg-white p-3 space-y-3 overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-w-6xl mx-auto">
+                <div class="bg-white border border-slate-100 rounded-xl p-4 space-y-3">
+                    <div class="flex gap-2"><div class="h-4 w-16 rounded skeleton-block"></div><div class="h-4 w-24 rounded skeleton-block"></div></div>
+                    <div class="h-5 w-40 rounded skeleton-block"></div>
+                    <div class="h-3.5 w-56 rounded skeleton-block"></div>
+                    <div class="h-8 w-full rounded-lg skeleton-block"></div>
+                </div>
+                <div class="bg-white border border-slate-100 rounded-xl p-4 space-y-3">
+                    <div class="flex gap-2"><div class="h-4 w-16 rounded skeleton-block"></div><div class="h-4 w-20 rounded skeleton-block"></div></div>
+                    <div class="h-5 w-36 rounded skeleton-block"></div>
+                    <div class="h-3.5 w-48 rounded skeleton-block"></div>
+                    <div class="h-8 w-full rounded-lg skeleton-block"></div>
+                </div>
+                <div class="bg-white border border-slate-100 rounded-xl p-4 space-y-3">
+                    <div class="flex gap-2"><div class="h-4 w-14 rounded skeleton-block"></div><div class="h-4 w-28 rounded skeleton-block"></div></div>
+                    <div class="h-5 w-44 rounded skeleton-block"></div>
+                    <div class="h-3.5 w-52 rounded skeleton-block"></div>
+                    <div class="h-8 w-full rounded-lg skeleton-block"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODE 1: Main Excel Table Grid (Pure White, Zero Extra Gap, No Shadows) -->
+        <div class="excel-grid-container flex-1 w-full bg-white m-0 p-0" id="gridScrollContainer">
+            <table class="excel-table" id="excelTable">
+                <thead id="excelThead"></thead>
+                <tbody id="excelTbody"></tbody>
+            </table>
+        </div>
+
+        <!-- MODE 2: Box View Container (Pure White Background, Zero Card Shadows) -->
+        <div id="boxViewContainer" class="hidden flex-1 w-full bg-white overflow-y-auto p-3 sm:p-4">
+            <div id="boxCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-w-6xl mx-auto"></div>
+        </div>
+
+        <!-- Bottom Sheet Drawer (Pure White Background Matching Excel & Box Views + Input & Submit) -->
+        <div id="boxDetailDrawer" class="hidden fixed inset-0 z-50 flex flex-col justify-end pointer-events-auto">
+            <div id="boxDrawerBackdrop" class="bottom-drawer-backdrop fixed inset-0 bg-black/20 opacity-0"></div>
+            <div id="boxDrawerPanel" class="bottom-drawer-panel relative z-10 bg-white w-full max-w-2xl mx-auto rounded-t-2xl border-t border-slate-200 max-h-[85vh] flex flex-col translate-y-full">
+                <!-- Drawer Handle Bar (Pure White Header Area) -->
+                <div class="w-full pt-2.5 pb-1 bg-white rounded-t-2xl flex justify-center shrink-0">
+                    <div class="w-10 h-1 bg-slate-300 rounded-full"></div>
+                </div>
+                <!-- Drawer Header (Pure White) -->
+                <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+                    <div class="min-w-0 pr-2">
+                        <div class="flex items-center gap-2">
+                            <h3 id="drawerTerminalId" class="text-base font-bold text-slate-900 truncate">Terminal ID</h3>
+                            <span id="drawerStatusPill" class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-50 text-red-700 border border-red-200">Out Of Service</span>
+                        </div>
+                        <p id="drawerLocation" class="text-xs text-slate-500 truncate mt-0.5">Location</p>
+                    </div>
+                    <button id="closeBoxDrawerBtn" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Drawer Scrollable Content: Pure White Background throughout Input + Submit + Errors + 2x2 Grid -->
+                <div class="p-4 bg-white overflow-y-auto space-y-4">
+                    <!-- Remark / Input & Submit Section for Report (Pure White Background) -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-3">
+                        <label for="drawerRemarkInput" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Enter Remark / Action Input
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <input
+                                type="text"
+                                id="drawerRemarkInput"
+                                placeholder="Type remark or status note..."
+                                class="flex-1 text-xs bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-slate-900 focus:outline-none focus:border-black"
+                            />
+                            <button
+                                id="drawerSubmitReportBtn"
+                                type="button"
+                                class="native-btn px-4 py-2.5 rounded-lg text-xs font-bold bg-[#141414] text-white shrink-0"
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="drawerErrorsSection" class="hidden bg-white">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-red-600 mb-1.5">Errors</div>
+                        <div id="drawerErrorsList" class="space-y-1.5"></div>
+                    </div>
+
+                    <div class="bg-white">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">ATM Details (2x2 View)</div>
+                        <div id="drawerDetailsGrid" class="grid grid-cols-2 gap-2.5 bg-white"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Options Popup Modal (PDF, Excel, Copy Exact Format) -->
+        <div id="shareOptionsModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
+                <div class="px-4 py-3.5 bg-white border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Share Report</h3>
+                        <p class="text-[11px] text-slate-500">Export or copy submitted report entries</p>
+                    </div>
+                    <button id="closeShareModalBtn" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-3 bg-white space-y-2">
+                    <!-- Option 1: PDF -->
+                    <button id="sharePdfBtn" type="button" class="w-full bg-white flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 active:bg-slate-100 transition text-left">
+                        <div class="w-9 h-9 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">PDF</div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">Export as PDF</div>
+                            <div class="text-[11px] text-slate-500">Download clean formatted PDF report</div>
+                        </div>
+                    </button>
+                    <!-- Option 2: Excel -->
+                    <button id="shareExcelBtn" type="button" class="w-full bg-white flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 active:bg-slate-100 transition text-left">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">XLS</div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">Export as Excel (.xlsx)</div>
+                            <div class="text-[11px] text-slate-500">Download spreadsheet with submitted input</div>
+                        </div>
+                    </button>
+                    <!-- Option 3: Copy Exact Text Format -->
+                    <button id="shareCopyFormatBtn" type="button" class="w-full bg-white flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 active:bg-slate-100 transition text-left">
+                        <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold text-xs shrink-0">COPY</div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">Copy Format</div>
+                            <div class="text-[11px] text-slate-500">01 Terminal ID, Location:-, Errors :-, Input</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subtle Native Toast Notification -->
+        <div id="toastBanner" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-[#141414] text-white text-xs font-semibold px-4 py-2.5 rounded-full">
+            Saved to Report
+        </div>
+
+        <!-- Top Main Filter Popup Modal (Headings Tick + Nested Values Tick + Layout Lock) -->
+        <div id="mainFilterModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden">
+                <!-- Modal Header -->
+                <div class="px-4 py-3.5 border-b border-gray-200 flex items-center justify-between bg-white">
+                    <div>
+                        <h3 class="text-base font-bold text-gray-900">Filter Headings & Values</h3>
+                        <p class="text-[11.5px] text-gray-500">Tick headings to display and expand to tick specific values</p>
+                    </div>
+                    <button id="closeMainModalBtn" type="button" class="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Lock Layout Bar -->
+                <div class="px-4 py-2.5 bg-amber-50/90 border-b border-amber-200 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-1.5 rounded-lg bg-amber-100 text-amber-800">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-gray-900">Lock Filter & Heading Layout</div>
+                            <div class="text-[11px] text-gray-600">Keeps layout & data saved on refresh and auto-applies to new files</div>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="lockLayoutToggle" class="sr-only peer">
+                        <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#141414]"></div>
+                    </label>
+                </div>
+
+                <!-- Search & Master Select Bar -->
+                <div class="px-4 py-2.5 bg-white border-b border-gray-200 flex flex-col gap-2">
+                    <input type="text" id="mainModalSearch" placeholder="Search heading name..." class="w-full text-xs bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-gray-900" />
+                    <div class="flex items-center justify-between text-xs">
+                        <label class="flex items-center gap-2 font-semibold text-gray-800 cursor-pointer">
+                            <input type="checkbox" id="mainModalAllHeadingsToggle" class="w-4 h-4 rounded border-gray-300 text-black focus:ring-0" checked />
+                            <span>Tick / Untick All Headings</span>
+                        </label>
+                        <button id="resetAllFiltersBtn" type="button" class="text-xs font-semibold text-red-600 hover:underline">
+                            Reset All Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scrollable List of Headings + Expandable Value Checkboxes Underneath -->
+                <div id="mainModalHeadingsList" class="flex-1 bg-white overflow-y-auto divide-y divide-gray-100 px-3 py-2"></div>
+
+                <!-- Modal Footer -->
+                <div class="px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-end gap-2.5">
+                    <button id="cancelMainModalBtn" type="button" class="px-4 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">
+                        Cancel
+                    </button>
+                    <button id="applyMainModalBtn" type="button" class="px-5 py-2 rounded-lg text-xs font-semibold bg-[#141414] text-white hover:bg-gray-800">
+                        Apply & Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hidden Textarea for Reliable Clipboard Copy -->
+    <textarea id="clipboardHelper" class="fixed -top-96 -left-96 opacity-0 pointer-events-none"></textarea>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Exact 39 Headings (with the 2 blank columns removed)
+        const DEFAULT_HEADERS = [
+            "Terminal ID",
+            "Location",
+            "City",
+            "MODULE",
+            "Region Name",
+            "Network",
+            "Circle",
+            "Card Reader Error",
+            "Cash Handler Error",
+            "All Cassettes Down/Fatal",
+            "Local/Communication Error",
+            "Exclusive Local Error",
+            "JP Error",
+            "Cashout Error",
+            "In Supervisory",
+            "Closed",
+            "Encryptor Error",
+            "Reject Bin Error",
+            "All Cassettes Down/Fatal Admin Cash",
+            "Reciept Print Fatal",
+            "Cash Acceptor Faults",
+            "All Cassettes Full",
+            "AB Full/Reject bin Overfill",
+            "MS Vendor",
+            "SWITCH",
+            "ATM Make",
+            "Site Type",
+            "Machine Type",
+            "Connectivity",
+            "Associate Bank",
+            "Last TLF Trans Time",
+            "Last Withdrawal Time",
+            "Last Deposit Time",
+            "Status",
+            "Longitude",
+            "Latitude",
+            "Channel Manager Phone",
+            "Age",
+            "Total End Cash_Default Currency",
+            "High Trns ATMs"
+        ];
+
+        const ERROR_COLUMN_NAMES = [
+            "Card Reader Error",
+            "Cash Handler Error",
+            "All Cassettes Down/Fatal",
+            "Local/Communication Error",
+            "Exclusive Local Error",
+            "JP Error",
+            "Cashout Error",
+            "In Supervisory",
+            "Closed",
+            "Encryptor Error",
+            "Reject Bin Error",
+            "All Cassettes Down/Fatal Admin Cash",
+            "Reciept Print Fatal",
+            "Cash Acceptor Faults",
+            "All Cassettes Full",
+            "AB Full/Reject bin Overfill"
+        ];
+
+        const DEFAULT_ROWS = [];
+
+        // Core Application State
+        let currentHeaders = [...DEFAULT_HEADERS];
+        let currentRows = [...DEFAULT_ROWS];
+        let currentHeadingTitle = "09-Nov-2026 05-44 PM";
+        let currentViewMode = 'excel';
+        let isLayoutLocked = false;
+        let visibleHeadings = new Set(DEFAULT_HEADERS);
+        let valueFilters = {};
+        let draftVisibleHeadings = new Set(DEFAULT_HEADERS);
+        let draftValueFilters = {};
+        let draftExpandedHeadings = new Set();
+        let lastFilteredRows = [];
+        let activeDrawerRow = null;
+        let reportSubmissions = [];
+        let isReportPageActive = false;
+
+        // DOM Elements
+        const uploadScreen = document.getElementById('uploadScreen');
+        const excelScreen = document.getElementById('excelScreen');
+        const fileInput = document.getElementById('excelFileInput');
+        const btnLabel = document.getElementById('btnLabel');
+        const backToUploadBtn = document.getElementById('backToUploadBtn');
+        const sheetFileName = document.getElementById('sheetFileName');
+        const sheetRowCount = document.getElementById('sheetRowCount');
+        const lockStatusBadge = document.getElementById('lockStatusBadge');
+        const openReportPageBtn = document.getElementById('openReportPageBtn');
+        const reportCountBadge = document.getElementById('reportCountBadge');
+        const openShareModalBtn = document.getElementById('openShareModalBtn');
+        const toggleViewModeBtn = document.getElementById('toggleViewModeBtn');
+        const iconBoxView = document.getElementById('iconBoxView');
+        const iconExcelView = document.getElementById('iconExcelView');
+        const openMainFilterModalBtn = document.getElementById('openMainFilterModalBtn');
+        const activeFilterBadge = document.getElementById('activeFilterBadge');
+        const skeletonContainer = document.getElementById('skeletonContainer');
+        const gridScrollContainer = document.getElementById('gridScrollContainer');
+        const excelThead = document.getElementById('excelThead');
+        const excelTbody = document.getElementById('excelTbody');
+        const boxViewContainer = document.getElementById('boxViewContainer');
+        const boxCardsGrid = document.getElementById('boxCardsGrid');
+        const boxDetailDrawer = document.getElementById('boxDetailDrawer');
+        const boxDrawerBackdrop = document.getElementById('boxDrawerBackdrop');
+        const boxDrawerPanel = document.getElementById('boxDrawerPanel');
+        const drawerTerminalId = document.getElementById('drawerTerminalId');
+        const drawerStatusPill = document.getElementById('drawerStatusPill');
+        const drawerLocation = document.getElementById('drawerLocation');
+        const closeBoxDrawerBtn = document.getElementById('closeBoxDrawerBtn');
+        const drawerRemarkInput = document.getElementById('drawerRemarkInput');
+        const drawerSubmitReportBtn = document.getElementById('drawerSubmitReportBtn');
+        const drawerErrorsSection = document.getElementById('drawerErrorsSection');
+        const drawerErrorsList = document.getElementById('drawerErrorsList');
+        const drawerDetailsGrid = document.getElementById('drawerDetailsGrid');
+        const shareOptionsModal = document.getElementById('shareOptionsModal');
+        const closeShareModalBtn = document.getElementById('closeShareModalBtn');
+        const sharePdfBtn = document.getElementById('sharePdfBtn');
+        const shareExcelBtn = document.getElementById('shareExcelBtn');
+        const shareCopyFormatBtn = document.getElementById('shareCopyFormatBtn');
+        const toastBanner = document.getElementById('toastBanner');
+        const mainFilterModal = document.getElementById('mainFilterModal');
+        const closeMainModalBtn = document.getElementById('closeMainModalBtn');
+        const lockLayoutToggle = document.getElementById('lockLayoutToggle');
+        const mainModalSearch = document.getElementById('mainModalSearch');
+        const mainModalAllHeadingsToggle = document.getElementById('mainModalAllHeadingsToggle');
+        const resetAllFiltersBtn = document.getElementById('resetAllFiltersBtn');
+        const mainModalHeadingsList = document.getElementById('mainModalHeadingsList');
+        const cancelMainModalBtn = document.getElementById('cancelMainModalBtn');
+        const applyMainModalBtn = document.getElementById('applyMainModalBtn');
+        const clipboardHelper = document.getElementById('clipboardHelper');
+
+        // Dedicated Pages: Info (i) Page, Terms & Conditions Page, Privacy Policy Page & WhatsApp Help Form
+        const openAppInfoBtn = document.getElementById('openAppInfoBtn');
+        const appInfoModal = document.getElementById('appInfoModal');
+        const closeAppInfoBtn = document.getElementById('closeAppInfoBtn');
+        const infoTermsBtn = document.getElementById('infoTermsBtn');
+        const infoPrivacyBtn = document.getElementById('infoPrivacyBtn');
+        const bottomTermsLink = document.getElementById('bottomTermsLink');
+        const bottomPrivacyLink = document.getElementById('bottomPrivacyLink');
+        const termsPage = document.getElementById('termsPage');
+        const privacyPage = document.getElementById('privacyPage');
+        const backFromTermsBtn = document.getElementById('backFromTermsBtn');
+        const backFromPrivacyBtn = document.getElementById('backFromPrivacyBtn');
+        const whatsappHelpForm = document.getElementById('whatsappHelpForm');
+        const helpNameInput = document.getElementById('helpNameInput');
+        const helpContactInput = document.getElementById('helpContactInput');
+        const helpEmailInput = document.getElementById('helpEmailInput');
+        const helpMessageInput = document.getElementById('helpMessageInput');
+        const installPwaBtn = document.getElementById('installPwaBtn');
+
+        // Track where Legal Page was opened from ('upload' or 'info')
+        let legalReturnTarget = 'upload';
+
+        function openInfoPage() {
+            uploadScreen.classList.add('screen-hidden');
+            termsPage.classList.add('screen-hidden');
+            privacyPage.classList.add('screen-hidden');
+            appInfoModal.classList.remove('screen-hidden');
+        }
+
+        function closeInfoPage() {
+            appInfoModal.classList.add('screen-hidden');
+            uploadScreen.classList.remove('screen-hidden');
+        }
+
+        function openTermsPage(fromSource) {
+            legalReturnTarget = fromSource;
+            uploadScreen.classList.add('screen-hidden');
+            appInfoModal.classList.add('screen-hidden');
+            privacyPage.classList.add('screen-hidden');
+            termsPage.classList.remove('screen-hidden');
+        }
+
+        function openPrivacyPage(fromSource) {
+            legalReturnTarget = fromSource;
+            uploadScreen.classList.add('screen-hidden');
+            appInfoModal.classList.add('screen-hidden');
+            termsPage.classList.add('screen-hidden');
+            privacyPage.classList.remove('screen-hidden');
+        }
+
+        openAppInfoBtn.addEventListener('click', openInfoPage);
+        closeAppInfoBtn.addEventListener('click', closeInfoPage);
+
+        bottomTermsLink.addEventListener('click', () => openTermsPage('upload'));
+        bottomPrivacyLink.addEventListener('click', () => openPrivacyPage('upload'));
+        infoTermsBtn.addEventListener('click', () => openTermsPage('info'));
+        infoPrivacyBtn.addEventListener('click', () => openPrivacyPage('info'));
+
+        backFromTermsBtn.addEventListener('click', () => {
+            termsPage.classList.add('screen-hidden');
+            if (legalReturnTarget === 'info') {
+                appInfoModal.classList.remove('screen-hidden');
+            } else {
+                uploadScreen.classList.remove('screen-hidden');
+            }
+        });
+
+        backFromPrivacyBtn.addEventListener('click', () => {
+            privacyPage.classList.add('screen-hidden');
+            if (legalReturnTarget === 'info') {
+                appInfoModal.classList.remove('screen-hidden');
+            } else {
+                uploadScreen.classList.remove('screen-hidden');
+            }
+        });
+
+        // Handle Help Form Submit -> Redirects to WhatsApp (9405173048) in Clean Best Format
+        whatsappHelpForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userName = helpNameInput.value.trim();
+            const userContact = helpContactInput.value.trim();
+            const userEmail = helpEmailInput.value.trim();
+            const userNote = helpMessageInput.value.trim();
+
+            if (!userName || !userContact || !userEmail) {
+                showToast("Please fill Name, Contact & Email");
+                return;
+            }
+
+            const lines = [
+                "*APP HELP REQUEST (Version 001)*",
+                "--------------------------------",
+                `*Name:* ${userName}`,
+                `*Contact:* ${userContact}`,
+                `*Email:* ${userEmail}`
+            ];
+            if (userNote) {
+                lines.push(`*Help Note:* ${userNote}`);
+            }
+            lines.push("--------------------------------");
+            lines.push("*Developer:* Kamlesh Suryavanshi");
+
+            const waText = encodeURIComponent(lines.join('\n'));
+            const waUrl = `https://wa.me/919405173048?text=${waText}`;
+            window.open(waUrl, '_blank', 'noopener,noreferrer');
+        });
+
+        // ==================== CHROME PWA INSTALLABILITY & CUSTOM SVG LAUNCHER LOGO ====================
+        let deferredInstallPrompt = null;
+
+        function setupPwaAndLauncherLogo() {
+            // Exact Same Upload Page Illustration inside App Box Icon for Chrome Install / Launcher
+            const launcherSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 320" width="512" height="512">
+                <rect width="360" height="320" rx="72" fill="#ffffff"/>
+                <defs>
+                    <clipPath id="pwaFlameLeftClip">
+                        <path d="M 225 256 C 194 256 189 229 197 210 C 199 213 203 216 206 218 C 199 205 198 189 203 177 C 207 182 211 187 214 192 C 212 179 214 166 218 158 C 227 195 225 230 225 256 Z" />
+                    </clipPath>
+                </defs>
+                <path d="M 78 273 L 285 273" stroke="#0d0d0d" stroke-width="3.5" stroke-linecap="round"/>
+                <path d="M 92 276 L 265 276" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M 112 204 L 112 272" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <path d="M 112 227 L 95 235 C 90 237 89 242 95 242 L 112 238" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 150 56 C 136 58 134 72 133 88 C 132 101 124 105 111 111 C 96 117 94 132 96 154 C 98 176 96 196 114 205 C 122 209 131 209 139 207 L 139 240 L 194 240 L 192 178 L 180 151 L 173 94 C 170 74 166 55 150 56 Z" fill="#ffffff"/>
+                <path d="M 150 55 C 154 47 159 43 162 43 C 159 48 157 52 157 55 C 162 50 166 49 168 51 C 164 54 160 56 157 57" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 150 56 C 136 58 134 72 133 88 C 132 101 124 105 111 111 C 96 117 94 132 96 154 C 98 176 96 197 115 205 C 125 209 133 208 139 205" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <path d="M 158 56 C 168 58 172 72 175 91 C 177 106 179 122 181 134" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round"/>
+                <path d="M 151 73 C 146 70 139 73 140 82 C 140 89 146 93 149 101 C 151 108 156 112 160 110 C 164 108 165 98 163 90 C 162 85 167 80 164 73 C 161 68 154 70 151 75 Z" stroke="#0d0d0d" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M 148 79 L 148 83 M 155 78 L 155 82" stroke="#0d0d0d" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M 151 87 C 151 95 154 103 157 103 C 160 103 160 94 158 87 Z" stroke="#0d0d0d" stroke-width="2.6" stroke-linejoin="round" fill="none"/>
+                <path d="M 181 134 C 185 123 190 105 193 90 C 195 81 200 82 200 90 C 200 97 198 104 197 108" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M 198 101 C 206 100 209 105 203 109 C 210 109 211 115 204 118 C 210 119 210 125 203 127 C 207 129 205 134 198 135 C 194 135 190 134 188 132" stroke="#0d0d0d" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M 198 135 C 195 148 189 156 181 154" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+                <path d="M 124 136 C 138 140 152 140 164 144 C 171 146 175 153 172 158 C 169 162 165 161 163 158 C 161 163 156 163 154 159 C 151 163 146 162 145 158 C 135 160 120 165 109 158" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 140 183 C 141 200 141 220 141 239 M 168 181 C 169 200 169 220 169 239 M 173 164 C 189 172 193 195 192 237" stroke="#0d0d0d" stroke-width="3.6" stroke-linecap="round" fill="none"/>
+                <path d="M 141 243 C 135 247 135 255 142 256 C 139 262 145 267 151 263 C 153 268 161 268 163 262 C 168 265 174 260 171 253 C 170 249 169 244 168 241" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 171 251 C 174 259 180 263 184 259 C 186 264 193 264 194 258 C 200 260 205 254 199 249 C 203 245 200 239 193 239" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 172 151 L 216 146" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                <path d="M 218 139 L 239 139 C 243 139 245 143 245 147 C 245 151 243 155 239 155 L 218 155 Z" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.2" stroke-linejoin="round"/>
+                <path d="M 245 147 L 253 146" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round"/>
+                <path d="M 225 256 C 225 230 227 195 218 158 C 231 169 239 187 240 202 C 244 196 249 191 251 187 C 254 198 253 209 250 218 C 255 214 259 213 261 211 C 266 229 258 252 225 256 Z" fill="#FF521B"/>
+                <g clip-path="url(#pwaFlameLeftClip)">
+                    <rect x="185" y="155" width="50" height="105" fill="#C8A4F8"/>
+                    <path d="M 192 212 C 204 209 212 215 211 225 C 210 234 198 235 192 228 Z" fill="#FDBA31"/>
+                    <path d="M 215 178 C 224 182 228 196 222 206 C 216 214 210 202 215 178 Z" fill="#FDBA31"/>
+                    <path d="M 204 242 C 208 233 216 233 218 242 C 220 250 210 256 204 248 Z" fill="#FDBA31"/>
+                </g>
+                <path d="M 212 252 L 260 252 C 267 252 271 258 271 263 C 271 268 267 272 260 272 L 212 272" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <ellipse cx="212" cy="262" rx="6.5" ry="10" fill="#ffffff" stroke="#0d0d0d" stroke-width="3.4"/>
+            </svg>`;
+
+            const svgDataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(launcherSvg);
+            const favEl = document.getElementById('dynamicFavicon');
+            const appleEl = document.getElementById('dynamicAppleIcon');
+            if (favEl) favEl.href = svgDataUrl;
+            if (appleEl) appleEl.href = svgDataUrl;
+
+            const manifestObj = {
+                name: "MonitoringExel",
+                short_name: "MonitoringExel",
+                description: "Private Excel & ATM Out Of Service Status Viewer (Version 001) by Kamlesh Suryavanshi",
+                start_url: window.location.href,
+                display: "standalone",
+                background_color: "#ffffff",
+                theme_color: "#ffffff",
+                orientation: "portrait-primary",
+                icons: [
+                    {
+                        src: svgDataUrl,
+                        sizes: "192x192 512x512",
+                        type: "image/svg+xml",
+                        purpose: "any maskable"
+                    }
+                ]
+            };
+
+            const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/manifest+json' });
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            const manifestLink = document.getElementById('dynamicManifest');
+            if (manifestLink) manifestLink.href = manifestUrl;
+
+            if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
+                const swCode = `
+                    self.addEventListener('install', (e) => self.skipWaiting());
+                    self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+                    self.addEventListener('fetch', (e) => {});
+                `;
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl).catch(() => {});
+            }
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            installPwaBtn.classList.remove('hidden');
+        });
+
+        installPwaBtn.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) {
+                showToast("Use Chrome menu -> 'Add to Home screen' or 'Install app'");
+                return;
+            }
+            deferredInstallPrompt.prompt();
+            await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            installPwaBtn.classList.add('hidden');
+        });
+
+        setupPwaAndLauncherLogo();
+
+        // ==================== FIREBASE CLOUD PERSISTENCE ====================
+        let db = null;
+        let currentUser = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-excel-app';
+
+        function showToast(msg) {
+            toastBanner.textContent = msg;
+            toastBanner.classList.remove('hidden');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => {
+                toastBanner.classList.add('hidden');
+            }, 2200);
+        }
+
+        function updateReportBadge() {
+            const count = reportSubmissions.length;
+            if (count > 0) {
+                reportCountBadge.textContent = String(count);
+                reportCountBadge.classList.remove('hidden');
+            } else {
+                reportCountBadge.classList.add('hidden');
+            }
+        }
+
+        // Smooth Skeleton Shimmer Transition Helper
+        function runWithSkeleton(callback, duration = 220) {
+            gridScrollContainer.classList.add('hidden');
+            boxViewContainer.classList.add('hidden');
+            skeletonContainer.classList.remove('hidden');
+            setTimeout(() => {
+                skeletonContainer.classList.add('hidden');
+                callback();
+                updateViewModeUI();
+            }, duration);
+        }
+
+        async function initCloudStorage() {
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) return;
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                currentUser = auth.currentUser;
+                if (!currentUser) return;
+
+                const stateDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'excel_viewer_state', 'active_session');
+                const snap = await getDoc(stateDocRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data.isLayoutLocked) {
+                        isLayoutLocked = true;
+                        if (data.visibleHeadingsJson) {
+                            const parsedVis = JSON.parse(data.visibleHeadingsJson);
+                            if (Array.isArray(parsedVis) && parsedVis.length > 0) {
+                                visibleHeadings = new Set(parsedVis);
+                                visibleHeadings.add("Terminal ID");
+                            }
+                        }
+                        if (data.valueFiltersJson) {
+                            const parsedVF = JSON.parse(data.valueFiltersJson);
+                            valueFilters = {};
+                            Object.keys(parsedVF).forEach(k => {
+                                valueFilters[k] = new Set(parsedVF[k]);
+                            });
+                        }
+                    }
+                    if (data.viewMode === 'box' || data.viewMode === 'excel') {
+                        currentViewMode = data.viewMode;
+                        updateViewModeUI();
+                    }
+                    if (data.reportSubmissionsJson) {
+                        const parsedRep = JSON.parse(data.reportSubmissionsJson);
+                        if (Array.isArray(parsedRep)) {
+                            reportSubmissions = parsedRep;
+                            updateReportBadge();
+                        }
+                    }
+
+                    if (data.hasOpenSheet && data.headersJson && data.rowsJson) {
+                        const savedHeaders = JSON.parse(data.headersJson);
+                        const savedRows = JSON.parse(data.rowsJson);
+                        if (Array.isArray(savedHeaders) && savedHeaders.length > 0) {
+                            currentHeaders = savedHeaders;
+                            currentRows = Array.isArray(savedRows) ? savedRows : [];
+                            currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
+                            if (!isLayoutLocked) {
+                                visibleHeadings = new Set(currentHeaders);
+                            }
+                            openExcelViewer(currentHeadingTitle, false);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Cloud state sync skipped:", e);
+            }
+        }
+
+        async function saveStateToCloud(hasOpenSheet = true) {
+            if (!db || !currentUser) return;
+            try {
+                const serializableVF = {};
+                Object.keys(valueFilters).forEach(k => {
+                    serializableVF[k] = Array.from(valueFilters[k]);
+                });
+
+                const rowsToSave = currentRows.slice(0, 600);
+
+                const stateDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'excel_viewer_state', 'active_session');
+                await setDoc(stateDocRef, {
+                    hasOpenSheet,
+                    headingTitle: currentHeadingTitle,
+                    viewMode: currentViewMode,
+                    isLayoutLocked,
+                    visibleHeadingsJson: JSON.stringify(Array.from(visibleHeadings)),
+                    valueFiltersJson: JSON.stringify(serializableVF),
+                    headersJson: JSON.stringify(currentHeaders),
+                    rowsJson: JSON.stringify(rowsToSave),
+                    reportSubmissionsJson: JSON.stringify(reportSubmissions.slice(0, 300)),
+                    updatedAt: Date.now()
+                });
+            } catch (e) {
+                console.warn("Save cloud state error:", e);
+            }
+        }
+
+        // Extract only the Date & Time stamp from the uploaded filename (e.g., "09-Nov-2026 05-44 PM")
+        function extractDateTimeHeading(rawFileName) {
+            if (!rawFileName) return '09-Nov-2026 05-44 PM';
+            const base = rawFileName.replace(/\.[^/.]+$/, "");
+            const dateTimeRegex = /(\d{1,2}[-/\s][A-Za-z]{3,9}[-/\s]\d{2,4}\s+\d{1,2}[-:]\d{2}(?:\s*[APap][Mm])?)/;
+            const match = base.match(dateTimeRegex);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+            const exportedMatch = base.match(/Exported\s+on\s+([^)]+)/i);
+            if (exportedMatch && exportedMatch[1]) {
+                return exportedMatch[1].trim();
+            }
+            return base.trim();
+        }
+
+        // Get active base rows depending on whether user is on Main Sheet or Report Page
+        function getBaseDatasetRows() {
+            if (isReportPageActive) {
+                return reportSubmissions.map(item => item.row);
+            }
+            return currentRows;
+        }
+
+        // Get unique sorted string values for a specific column index
+        function getUniqueColumnValues(colIndex) {
+            const set = new Set();
+            const baseRows = getBaseDatasetRows();
+            baseRows.forEach(row => {
+                const rawVal = row[colIndex];
+                const strVal = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '' ? String(rawVal).trim() : '(Blank)';
+                set.add(strVal);
+            });
+            return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        }
+
+        function hasActiveFilters() {
+            const anyHeadingHidden = currentHeaders.some(h => !visibleHeadings.has(h));
+            const anyValueFiltered = Object.keys(valueFilters).some(h => {
+                const colIdx = currentHeaders.indexOf(h);
+                if (colIdx === -1) return false;
+                const allVals = getUniqueColumnValues(colIdx);
+                return valueFilters[h] && valueFilters[h].size < allVals.length;
+            });
+            return anyHeadingHidden || anyValueFiltered;
+        }
+
+        function findColIndex(targetName) {
+            const norm = targetName.trim().toLowerCase();
+            return currentHeaders.findIndex(h => String(h || '').trim().toLowerCase() === norm);
+        }
+
+        function isErrorCellActive(rawVal) {
+            if (rawVal === undefined || rawVal === null) return false;
+            const s = String(rawVal).trim();
+            if (!s) return false;
+            const lower = s.toLowerCase();
+            if (lower === 'no' || lower === 'n' || lower === '-' || lower === '0' || lower === 'false' || lower === 'nil' || lower === 'na' || lower === 'n/a' || lower === 'none') {
+                return false;
+            }
+            return true;
+        }
+
+        // Extract active error headings for a specific row (Only the heading names)
+        function getActiveErrorsForRow(row) {
+            const activeList = [];
+            ERROR_COLUMN_NAMES.forEach(errColName => {
+                const idx = findColIndex(errColName);
+                if (idx !== -1) {
+                    const cellVal = row[idx];
+                    if (isErrorCellActive(cellVal)) {
+                        activeList.push({
+                            name: currentHeaders[idx]
+                        });
+                    }
+                }
+            });
+            return activeList;
+        }
+
+        // Get saved input remark for a Terminal ID if submitted
+        function getSavedInputForTerminal(tid) {
+            const found = reportSubmissions.find(item => item.terminalId === tid);
+            return found ? found.input : '';
+        }
+
+        // Switch UI between Excel Table View and Box Card View
+        function updateViewModeUI() {
+            if (!skeletonContainer.classList.contains('hidden')) return;
+            if (currentViewMode === 'box') {
+                gridScrollContainer.classList.add('hidden');
+                boxViewContainer.classList.remove('hidden');
+                iconBoxView.classList.add('hidden');
+                iconExcelView.classList.remove('hidden');
+            } else {
+                boxViewContainer.classList.add('hidden');
+                gridScrollContainer.classList.remove('hidden');
+                iconExcelView.classList.add('hidden');
+                iconBoxView.classList.remove('hidden');
+            }
+        }
+
+        toggleViewModeBtn.addEventListener('click', () => {
+            currentViewMode = currentViewMode === 'excel' ? 'box' : 'excel';
+            runWithSkeleton(() => {
+                renderExcelGrid();
+                saveStateToCloud(true);
+            }, 180);
+        });
+
+        // Switch between Main Sheet and Report Page
+        function updateHeaderForPageMode() {
+            if (isReportPageActive) {
+                sheetFileName.textContent = "Report";
+                openReportPageBtn.classList.add('hidden');
+                openShareModalBtn.classList.remove('hidden');
+            } else {
+                sheetFileName.textContent = currentHeadingTitle;
+                openShareModalBtn.classList.add('hidden');
+                openReportPageBtn.classList.remove('hidden');
+            }
+            updateReportBadge();
+        }
+
+        openReportPageBtn.addEventListener('click', () => {
+            isReportPageActive = true;
+            updateHeaderForPageMode();
+            runWithSkeleton(() => {
+                renderExcelGrid();
+            }, 220);
+        });
+
+        // Render Box View Cards (Pure White Background, No Card Shadows, Numbered Error Headings Only: 01, 02...)
+        function renderBoxView(filteredRows) {
+            const tidIdx = findColIndex("Terminal ID");
+            const locIdx = findColIndex("Location");
+            const siteIdx = findColIndex("Site Type");
+            const regIdx = findColIndex("Region Name");
+            const vendorIdx = findColIndex("MS Vendor");
+
+            if (filteredRows.length === 0) {
+                boxCardsGrid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-sm text-slate-400">
+                        ${isReportPageActive ? 'No submitted ATMs in Report yet. Tap any ATM and click Submit.' : 'No matching ATM records found for the selected filters.'}
+                    </div>
+                `;
+                return;
+            }
+
+            let cardsHTML = '';
+            filteredRows.forEach((row, rIdx) => {
+                const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : `ATM-${rIdx + 1}`;
+                const location = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim() : 'Location N/A';
+                const siteType = siteIdx !== -1 && row[siteIdx] ? String(row[siteIdx]).trim() : '';
+                const region = regIdx !== -1 && row[regIdx] ? String(row[regIdx]).trim() : '';
+                const msVendor = vendorIdx !== -1 && row[vendorIdx] ? String(row[vendorIdx]).trim() : '';
+
+                const isOnsite = siteType.toUpperCase().includes('ONSITE');
+                const siteBadgeClass = isOnsite
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200';
+
+                const activeErrors = getActiveErrorsForRow(row);
+                const savedRemark = getSavedInputForTerminal(tid);
+
+                // Display only 01, 02, 03 + Error Heading Name (No extra 'Errors' heading label above it and no timestamp clutter)
+                let errorsHTML = '';
+                if (activeErrors.length > 0) {
+                    errorsHTML = `<div class="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5">`;
+                    activeErrors.forEach((err, eIdx) => {
+                        const numStr = String(eIdx + 1).padStart(2, '0');
+                        errorsHTML += `
+                            <div class="flex items-center gap-2 bg-red-50/70 border border-red-100 rounded-lg px-2.5 py-1.5">
+                                <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-600 text-white shrink-0">${numStr}</span>
+                                <div class="text-xs font-semibold text-red-900 leading-snug break-words">
+                                    ${err.name}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    errorsHTML += `</div>`;
+                }
+
+                const remarkHTML = savedRemark ? `
+                    <div class="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-700">
+                        <span class="font-bold text-slate-900">Input:</span> ${savedRemark}
+                    </div>
+                ` : '';
+
+                cardsHTML += `
+                    <div class="atm-box-card bg-white rounded-xl border border-slate-200 p-3.5 active:scale-[0.99] transition cursor-pointer flex flex-col justify-between" data-row-idx="${rIdx}">
+                        <div>
+                            <!-- Top Tags: ONSITE/OFFSITE, Region Name, MS Vendor -->
+                            <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                                ${siteType ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase border ${siteBadgeClass}">${siteType}</span>` : ''}
+                                ${region ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white text-slate-700 border border-slate-200 truncate max-w-[140px]">${region}</span>` : ''}
+                                ${msVendor ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">${msVendor}</span>` : ''}
+                                <span class="ml-auto text-[11px] font-bold text-slate-400">#${rIdx + 1}</span>
+                            </div>
+
+                            <!-- Terminal ID & Slogan Type Location Below -->
+                            <div class="text-[16px] font-extrabold text-slate-900 tracking-tight leading-snug">${tid}</div>
+                            <div class="text-xs font-medium text-slate-500 mt-0.5 line-clamp-1">${location}</div>
+                        </div>
+
+                        <!-- Numbered Errors List (01, 02, 03...) -->
+                        ${errorsHTML}
+                        ${remarkHTML}
+                    </div>
+                `;
+            });
+
+            boxCardsGrid.innerHTML = cardsHTML;
+        }
+
+        // Open 2x2 Bottom Sheet Drawer Smoothly Over Current View (With Pure White Background + Input & Submit)
+        function openBoxDetailDrawer(rowIdx) {
+            const row = lastFilteredRows[rowIdx];
+            if (!row) return;
+            activeDrawerRow = row;
+
+            const tidIdx = findColIndex("Terminal ID");
+            const locIdx = findColIndex("Location");
+            const statusIdx = findColIndex("Status");
+
+            const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : 'N/A';
+            const loc = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim() : '';
+            const status = statusIdx !== -1 && row[statusIdx] ? String(row[statusIdx]).trim() : 'Out Of Service';
+
+            drawerTerminalId.textContent = tid;
+            drawerLocation.textContent = loc;
+            drawerStatusPill.textContent = status;
+            drawerRemarkInput.value = getSavedInputForTerminal(tid);
+
+            // Populate Active Errors in Drawer (Clean numbered heading names only)
+            const activeErrors = getActiveErrorsForRow(row);
+            if (activeErrors.length > 0) {
+                drawerErrorsSection.classList.remove('hidden');
+                drawerErrorsList.innerHTML = activeErrors.map((err, idx) => {
+                    const num = String(idx + 1).padStart(2, '0');
+                    return `
+                        <div class="flex items-center gap-2 bg-white border border-red-200 rounded-lg px-3 py-2">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-600 text-white shrink-0">${num}</span>
+                            <div class="text-xs font-bold text-red-900">${err.name}</div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                drawerErrorsSection.classList.add('hidden');
+                drawerErrorsList.innerHTML = '';
+            }
+
+            // Populate 2x2 Grid with all non-error columns (Pure White cards inside Drawer)
+            const errorSet = new Set(ERROR_COLUMN_NAMES.map(e => e.toLowerCase()));
+            let gridHTML = '';
+
+            currentHeaders.forEach((hName, colIdx) => {
+                const lowerH = String(hName).trim().toLowerCase();
+                if (errorSet.has(lowerH)) return;
+                if (lowerH === 'terminal id' || lowerH === 'location') return;
+                if (!visibleHeadings.has(hName)) return;
+
+                const rawVal = row[colIdx];
+                const valStr = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '' ? String(rawVal).trim() : '-';
+
+                gridHTML += `
+                    <div class="bg-white border border-slate-200 rounded-xl p-2.5">
+                        <div class="text-[10.5px] font-semibold text-slate-400 uppercase tracking-tight truncate">${hName}</div>
+                        <div class="text-xs font-bold text-slate-800 mt-0.5 break-words">${valStr}</div>
+                    </div>
+                `;
+            });
+
+            drawerDetailsGrid.innerHTML = gridHTML;
+
+            // Animate Drawer Smoothly Over Background Without Hiding Current View
+            boxDetailDrawer.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                boxDrawerBackdrop.classList.remove('opacity-0');
+                boxDrawerBackdrop.classList.add('opacity-100');
+                boxDrawerPanel.classList.remove('translate-y-full');
+                boxDrawerPanel.classList.add('translate-y-0');
+            });
+        }
+
+        function closeBoxDetailDrawer() {
+            boxDrawerBackdrop.classList.remove('opacity-100');
+            boxDrawerBackdrop.classList.add('opacity-0');
+            boxDrawerPanel.classList.remove('translate-y-0');
+            boxDrawerPanel.classList.add('translate-y-full');
+            setTimeout(() => {
+                boxDetailDrawer.classList.add('hidden');
+                activeDrawerRow = null;
+            }, 260);
+        }
+
+        // Submit Button inside Bottom Drawer -> Saves ATM + Input into Report Page
+        function handleDrawerSubmit() {
+            if (!activeDrawerRow) return;
+            const tidIdx = findColIndex("Terminal ID");
+            const tid = tidIdx !== -1 && activeDrawerRow[tidIdx] ? String(activeDrawerRow[tidIdx]).trim() : `ATM-${Date.now()}`;
+            const userRemark = drawerRemarkInput.value.trim();
+
+            const existingIndex = reportSubmissions.findIndex(item => item.terminalId === tid);
+            const entry = {
+                terminalId: tid,
+                row: [...activeDrawerRow],
+                input: userRemark
+            };
+
+            if (existingIndex !== -1) {
+                reportSubmissions[existingIndex] = entry;
+            } else {
+                reportSubmissions.push(entry);
+            }
+
+            updateReportBadge();
+            renderExcelGrid();
+            saveStateToCloud(true);
+            closeBoxDetailDrawer();
+            showToast("Saved to Report");
+        }
+
+        drawerSubmitReportBtn.addEventListener('click', handleDrawerSubmit);
+        drawerRemarkInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleDrawerSubmit();
+            }
+        });
+
+        // Click on Box Card opens Bottom Drawer
+        boxCardsGrid.addEventListener('click', (e) => {
+            const card = e.target.closest('.atm-box-card');
+            if (!card) return;
+            const rIdx = parseInt(card.dataset.rowIdx, 10);
+            if (!isNaN(rIdx)) {
+                openBoxDetailDrawer(rIdx);
+            }
+        });
+
+        // Click on Excel Table Row also opens Bottom Drawer so user can enter input & submit from Excel view too
+        excelTbody.addEventListener('click', (e) => {
+            const tr = e.target.closest('tr[data-row-idx]');
+            if (!tr) return;
+            const rIdx = parseInt(tr.dataset.rowIdx, 10);
+            if (!isNaN(rIdx)) {
+                openBoxDetailDrawer(rIdx);
+            }
+        });
+
+        closeBoxDrawerBtn.addEventListener('click', closeBoxDetailDrawer);
+        boxDrawerBackdrop.addEventListener('click', closeBoxDetailDrawer);
+
+        // Render Excel Table (No Per-Heading Filter Icons, No Shadows, Frozen Sr. No., Terminal ID & Top Row)
+        function renderExcelGrid() {
+            visibleHeadings.add("Terminal ID");
+            const baseRows = getBaseDatasetRows();
+
+            const filteredRows = baseRows.filter(row => {
+                for (let c = 0; c < currentHeaders.length; c++) {
+                    const hName = currentHeaders[c];
+                    const allowedSet = valueFilters[hName];
+                    if (allowedSet) {
+                        const rawVal = row[c];
+                        const strVal = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '' ? String(rawVal).trim() : '(Blank)';
+                        if (!allowedSet.has(strVal)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            });
+
+            lastFilteredRows = filteredRows;
+
+            const visibleCols = [];
+            currentHeaders.forEach((h, idx) => {
+                if (visibleHeadings.has(h)) {
+                    visibleCols.push({ header: h, index: idx });
+                }
+            });
+
+            sheetRowCount.textContent = isReportPageActive
+                ? `${filteredRows.length} Submitted in Report`
+                : `${filteredRows.length} of ${baseRows.length} ATMs • ${visibleCols.length} cols`;
+            lockStatusBadge.classList.toggle('hidden', !isLayoutLocked);
+            activeFilterBadge.classList.toggle('hidden', !hasActiveFilters());
+
+            // Build Frozen Top Heading Row (Sr. No. + Visible Headings ONLY, No Per-Heading Filter Icon)
+            let theadHTML = '<tr>';
+            theadHTML += `<th class="sheet-header-cell sticky-col-sr">Sr. No.</th>`;
+
+            visibleCols.forEach(col => {
+                const isTid = col.header.toLowerCase() === 'terminal id';
+                const stickyClass = isTid ? 'sticky-col-tid' : '';
+                theadHTML += `<th class="sheet-header-cell ${stickyClass} text-left">${col.header}</th>`;
+            });
+
+            if (isReportPageActive) {
+                theadHTML += `<th class="sheet-header-cell text-left">Input</th>`;
+            }
+
+            theadHTML += '</tr>';
+            excelThead.innerHTML = theadHTML;
+
+            // Build Data Rows with Sr. No. 1, 2, 3...
+            const tidIdx = findColIndex("Terminal ID");
+            let tbodyHTML = '';
+
+            if (filteredRows.length === 0) {
+                const totalSpan = visibleCols.length + (isReportPageActive ? 2 : 1);
+                tbodyHTML = `
+                    <tr>
+                        <td colspan="${totalSpan}" class="py-12 text-center text-xs text-slate-400">
+                            ${isReportPageActive ? 'No submitted ATMs in Report yet.' : 'No matching records found.'}
+                        </td>
+                    </tr>
+                `;
+            } else {
+                filteredRows.forEach((row, rIdx) => {
+                    const srNo = rIdx + 1;
+                    const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
+                    tbodyHTML += `<tr data-row-idx="${rIdx}" class="cursor-pointer">`;
+                    tbodyHTML += `<td class="sticky-col-sr font-semibold text-slate-500">${srNo}</td>`;
+
+                    visibleCols.forEach(col => {
+                        const isTid = col.header.toLowerCase() === 'terminal id';
+                        const stickyClass = isTid ? 'sticky-col-tid font-semibold text-slate-900' : '';
+                        const val = row[col.index] !== undefined && row[col.index] !== null ? row[col.index] : '';
+                        tbodyHTML += `<td class="text-left ${stickyClass}">${val}</td>`;
+                    });
+
+                    if (isReportPageActive) {
+                        const remark = getSavedInputForTerminal(tid);
+                        tbodyHTML += `<td class="text-left font-medium text-slate-900">${remark}</td>`;
+                    }
+
+                    tbodyHTML += `</tr>`;
+                });
+            }
+            excelTbody.innerHTML = tbodyHTML;
+
+            renderBoxView(filteredRows);
+            updateViewModeUI();
+        }
+
+        // ==================== REPORT SHARE OPTIONS (PDF, EXCEL, EXACT COPY FORMAT) ====================
+        openShareModalBtn.addEventListener('click', () => {
+            shareOptionsModal.classList.remove('hidden');
+        });
+        closeShareModalBtn.addEventListener('click', () => {
+            shareOptionsModal.classList.add('hidden');
+        });
+        shareOptionsModal.addEventListener('click', (e) => {
+            if (e.target === shareOptionsModal) {
+                shareOptionsModal.classList.add('hidden');
+            }
+        });
+
+        // Build Exact Copy Text Format per User Specification:
+        // 01 Terminal ID
+        // Location:- ...
+        // Errors :- 01 ... 02 ...
+        // Input
+        function buildExactCopyFormatText() {
+            const rowsToShare = lastFilteredRows;
+            const tidIdx = findColIndex("Terminal ID");
+            const locIdx = findColIndex("Location");
+
+            const blocks = rowsToShare.map((row, idx) => {
+                const num = String(idx + 1).padStart(2, '0');
+                const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
+                const loc = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim() : '';
+                const activeErrors = getActiveErrorsForRow(row);
+                const errFormatted = activeErrors.length > 0
+                    ? activeErrors.map((e, i) => `${String(i + 1).padStart(2, '0')} ${e.name}`).join(' ')
+                    : 'None';
+                const userRemark = getSavedInputForTerminal(tid);
+
+                return `${num} ${tid}\nLocation:- ${loc}\nErrors :- ${errFormatted}\n${userRemark}`;
+            });
+
+            return blocks.join('\n\n');
+        }
+
+        shareCopyFormatBtn.addEventListener('click', () => {
+            if (lastFilteredRows.length === 0) {
+                showToast("No report records to copy");
+                shareOptionsModal.classList.add('hidden');
+                return;
+            }
+            const formattedText = buildExactCopyFormatText();
+            clipboardHelper.value = formattedText;
+            clipboardHelper.select();
+            try {
+                document.execCommand('copy');
+                showToast("Report format copied!");
+            } catch (err) {
+                showToast("Copy completed");
+            }
+            shareOptionsModal.classList.add('hidden');
+        });
+
+        shareExcelBtn.addEventListener('click', () => {
+            if (lastFilteredRows.length === 0) {
+                showToast("No report records to export");
+                shareOptionsModal.classList.add('hidden');
+                return;
+            }
+            const tidIdx = findColIndex("Terminal ID");
+            const locIdx = findColIndex("Location");
+
+            const exportData = [
+                ["Sr. No.", "Terminal ID", "Location", "Errors", "Input"]
+            ];
+
+            lastFilteredRows.forEach((row, idx) => {
+                const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
+                const loc = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim() : '';
+                const errs = getActiveErrorsForRow(row).map((e, i) => `${String(i + 1).padStart(2, '0')} ${e.name}`).join(', ');
+                const remark = getSavedInputForTerminal(tid);
+                exportData.push([idx + 1, tid, loc, errs, remark]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Report");
+            XLSX.writeFile(wb, `ATM_Report_${currentHeadingTitle.replace(/[:/\s]+/g, '_')}.xlsx`);
+            shareOptionsModal.classList.add('hidden');
+            showToast("Excel Report Downloaded");
+        });
+
+        sharePdfBtn.addEventListener('click', () => {
+            if (lastFilteredRows.length === 0) {
+                showToast("No report records to export");
+                shareOptionsModal.classList.add('hidden');
+                return;
+            }
+            try {
+                const { jsPDF } = window.jspdf;
+                const docPdf = new jsPDF();
+                const tidIdx = findColIndex("Terminal ID");
+                const locIdx = findColIndex("Location");
+
+                docPdf.setFontSize(13);
+                docPdf.text(`ATM Report - ${currentHeadingTitle}`, 14, 15);
+
+                const bodyRows = lastFilteredRows.map((row, idx) => {
+                    const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
+                    const loc = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim() : '';
+                    const errs = getActiveErrorsForRow(row).map((e, i) => `${String(i + 1).padStart(2, '0')} ${e.name}`).join('\n');
+                    const remark = getSavedInputForTerminal(tid);
+                    return [String(idx + 1).padStart(2, '0'), tid, loc, errs, remark];
+                });
+
+                docPdf.autoTable({
+                    startY: 22,
+                    head: [['Sr.', 'Terminal ID', 'Location', 'Errors', 'Input']],
+                    body: bodyRows,
+                    styles: { fontSize: 8.5, cellPadding: 2.5 },
+                    headStyles: { fillColor: [20, 20, 20] }
+                });
+
+                docPdf.save(`ATM_Report_${currentHeadingTitle.replace(/[:/\s]+/g, '_')}.pdf`);
+                showToast("PDF Report Downloaded");
+            } catch (e) {
+                console.warn("PDF generation error:", e);
+                showToast("Could not generate PDF");
+            }
+            shareOptionsModal.classList.add('hidden');
+        });
+
+        // ==================== TOP MAIN FILTER POPUP MODAL (HEADINGS + NESTED VALUES + LOCK) ====================
+        function openMainFilterModal() {
+            draftVisibleHeadings = new Set(visibleHeadings);
+            draftValueFilters = {};
+            currentHeaders.forEach((h, idx) => {
+                const allVals = getUniqueColumnValues(idx);
+                if (valueFilters[h]) {
+                    draftValueFilters[h] = new Set(valueFilters[h]);
+                } else {
+                    draftValueFilters[h] = new Set(allVals);
+                }
+            });
+            lockLayoutToggle.checked = isLayoutLocked;
+            mainModalSearch.value = '';
+            renderMainModalHeadingsList();
+            mainFilterModal.classList.remove('hidden');
+        }
+
+        function renderMainModalHeadingsList() {
+            const q = mainModalSearch.value.trim().toLowerCase();
+            const matchingHeaders = currentHeaders.filter(h => h.toLowerCase().includes(q));
+
+            mainModalAllHeadingsToggle.checked = matchingHeaders.length > 0 && matchingHeaders.every(h => draftVisibleHeadings.has(h));
+
+            let html = '';
+            matchingHeaders.forEach(h => {
+                const colIdx = currentHeaders.indexOf(h);
+                const allVals = getUniqueColumnValues(colIdx);
+                const selectedValsSet = draftValueFilters[h] || new Set(allVals);
+                const isHeadingChecked = draftVisibleHeadings.has(h);
+                const isTid = h.toLowerCase() === 'terminal id';
+                const isExpanded = draftExpandedHeadings.has(h);
+                const safeH = h.replace(/"/g, '&quot;');
+
+                html += `
+                    <div class="py-1.5 bg-white">
+                        <div class="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50">
+                            <label class="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer">
+                                <input type="checkbox" class="modal-heading-checkbox w-4 h-4 rounded border-gray-300 text-black focus:ring-0 shrink-0" data-header="${safeH}" ${isHeadingChecked ? 'checked' : ''} ${isTid ? 'disabled' : ''} />
+                                <span class="text-xs font-semibold text-gray-900 truncate">${h} ${isTid ? '<span class="text-[10px] font-normal text-gray-400">(Fixed)</span>' : ''}</span>
+                            </label>
+                            <button type="button" class="modal-expand-values-btn flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 shrink-0" data-header="${safeH}">
+                                <span>Values (${selectedValsSet.size}/${allVals.length})</span>
+                                <svg class="w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                `;
+
+                // Nested Values Checklist directly underneath the Heading
+                if (isExpanded) {
+                    const allValChecked = selectedValsSet.size === allVals.length;
+                    html += `
+                        <div class="mt-1 ml-6 mr-2 p-2.5 bg-white rounded-lg border border-gray-200 space-y-1.5">
+                            <div class="flex items-center justify-between pb-1.5 border-b border-gray-200">
+                                <label class="flex items-center gap-2 text-[11px] font-bold text-gray-700 cursor-pointer">
+                                    <input type="checkbox" class="modal-val-select-all w-3.5 h-3.5 rounded border-gray-300 text-black focus:ring-0" data-header="${safeH}" ${allValChecked ? 'checked' : ''} />
+                                    <span>Select All Values (${allVals.length})</span>
+                                </label>
+                            </div>
+                            <div class="max-h-40 overflow-y-auto space-y-1 pr-1">
+                    `;
+                    allVals.forEach(v => {
+                        const vChecked = selectedValsSet.has(v) ? 'checked' : '';
+                        const safeV = v.replace(/"/g, '&quot;');
+                        html += `
+                            <label class="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs text-gray-700">
+                                <input type="checkbox" class="modal-nested-val-checkbox w-3.5 h-3.5 rounded border-gray-300 text-black focus:ring-0 shrink-0" data-header="${safeH}" value="${safeV}" ${vChecked} />
+                                <span class="truncate">${v}</span>
+                            </label>
+                        `;
+                    });
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `</div>`;
+            });
+
+            if (matchingHeaders.length === 0) {
+                html = `<div class="py-8 text-center text-xs text-gray-400">No matching headings found</div>`;
+            }
+
+            mainModalHeadingsList.innerHTML = html;
+        }
+
+        openMainFilterModalBtn.addEventListener('click', openMainFilterModal);
+        closeMainModalBtn.addEventListener('click', () => mainFilterModal.classList.add('hidden'));
+        cancelMainModalBtn.addEventListener('click', () => mainFilterModal.classList.add('hidden'));
+
+        mainModalSearch.addEventListener('input', renderMainModalHeadingsList);
+
+        mainModalAllHeadingsToggle.addEventListener('change', () => {
+            const q = mainModalSearch.value.trim().toLowerCase();
+            currentHeaders.forEach(h => {
+                if (h.toLowerCase().includes(q)) {
+                    if (mainModalAllHeadingsToggle.checked || h.toLowerCase() === 'terminal id') {
+                        draftVisibleHeadings.add(h);
+                    } else {
+                        draftVisibleHeadings.delete(h);
+                    }
+                }
+            });
+            renderMainModalHeadingsList();
+        });
+
+        resetAllFiltersBtn.addEventListener('click', () => {
+            draftVisibleHeadings = new Set(currentHeaders);
+            draftValueFilters = {};
+            currentHeaders.forEach((h, idx) => {
+                draftValueFilters[h] = new Set(getUniqueColumnValues(idx));
+            });
+            renderMainModalHeadingsList();
+        });
+
+        mainModalHeadingsList.addEventListener('click', (e) => {
+            const expandBtn = e.target.closest('.modal-expand-values-btn');
+            if (expandBtn) {
+                const h = expandBtn.dataset.header;
+                if (draftExpandedHeadings.has(h)) {
+                    draftExpandedHeadings.delete(h);
+                } else {
+                    draftExpandedHeadings.add(h);
+                }
+                renderMainModalHeadingsList();
+            }
+        });
+
+        mainModalHeadingsList.addEventListener('change', (e) => {
+            const target = e.target;
+            const h = target.dataset.header;
+            if (!h) return;
+
+            if (target.classList.contains('modal-heading-checkbox')) {
+                if (target.checked || h.toLowerCase() === 'terminal id') {
+                    draftVisibleHeadings.add(h);
+                } else {
+                    draftVisibleHeadings.delete(h);
+                }
+                renderMainModalHeadingsList();
+            } else if (target.classList.contains('modal-val-select-all')) {
+                const colIdx = currentHeaders.indexOf(h);
+                const allVals = getUniqueColumnValues(colIdx);
+                if (target.checked) {
+                    draftValueFilters[h] = new Set(allVals);
+                } else {
+                    draftValueFilters[h] = new Set();
+                }
+                renderMainModalHeadingsList();
+            } else if (target.classList.contains('modal-nested-val-checkbox')) {
+                if (!draftValueFilters[h]) {
+                    draftValueFilters[h] = new Set();
+                }
+                if (target.checked) {
+                    draftValueFilters[h].add(target.value);
+                } else {
+                    draftValueFilters[h].delete(target.value);
+                }
+                renderMainModalHeadingsList();
+            }
+        });
+
+        applyMainModalBtn.addEventListener('click', () => {
+            visibleHeadings = new Set(draftVisibleHeadings);
+            visibleHeadings.add("Terminal ID");
+
+            valueFilters = {};
+            currentHeaders.forEach((h, idx) => {
+                const allVals = getUniqueColumnValues(idx);
+                const set = draftValueFilters[h];
+                if (set && set.size < allVals.length) {
+                    valueFilters[h] = new Set(set);
+                }
+            });
+
+            isLayoutLocked = lockLayoutToggle.checked;
+            mainFilterModal.classList.add('hidden');
+            runWithSkeleton(() => {
+                renderExcelGrid();
+                saveStateToCloud(true);
+            }, 180);
+        });
+
+        // Smoothly transition from Upload screen to Excel Viewer screen with Skeleton effect
+        function openExcelViewer(fileNameOrHeading, shouldSave = true) {
+            currentHeadingTitle = extractDateTimeHeading(fileNameOrHeading);
+            isReportPageActive = false;
+            updateHeaderForPageMode();
+
+            if (!isLayoutLocked) {
+                visibleHeadings = new Set(currentHeaders);
+                valueFilters = {};
+            } else {
+                visibleHeadings.add("Terminal ID");
+            }
+
+            uploadScreen.classList.add('screen-hidden');
+            excelScreen.classList.remove('screen-hidden');
+
+            runWithSkeleton(() => {
+                renderExcelGrid();
+                if (shouldSave) {
+                    saveStateToCloud(true);
+                }
+            }, 240);
+        }
+
+        // Clean parsed Excel sheet: skip any top blank/title rows and remove blank header columns
+        function processUploadedSheetData(rawRows) {
+            if (!rawRows || !rawRows.length) return false;
+
+            let headerRowIdx = rawRows.findIndex(r =>
+                Array.isArray(r) && r.some(cell => String(cell || '').trim().toLowerCase() === 'terminal id')
+            );
+            if (headerRowIdx === -1) {
+                headerRowIdx = rawRows.findIndex(r =>
+                    Array.isArray(r) && r.filter(cell => String(cell || '').trim() !== '').length >= 5
+                );
+            }
+            if (headerRowIdx === -1) return false;
+
+            const rawHeaderRow = rawRows[headerRowIdx];
+            const validColIndices = [];
+            const cleanedHeaders = [];
+
+            rawHeaderRow.forEach((colName, idx) => {
+                const cleanName = String(colName || '').trim();
+                if (cleanName !== '') {
+                    validColIndices.push(idx);
+                    cleanedHeaders.push(cleanName);
+                }
+            });
+
+            if (cleanedHeaders.length === 0) return false;
+
+            const dataRows = rawRows
+                .slice(headerRowIdx + 1)
+                .filter(r => Array.isArray(r) && r.some(cell => String(cell || '').trim() !== ''))
+                .map(r => validColIndices.map(colIdx => (r[colIdx] !== undefined && r[colIdx] !== null ? r[colIdx] : '')));
+
+            currentHeaders = cleanedHeaders;
+            currentRows = dataRows;
+            return true;
+        }
+
+        // Handle File Upload
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            btnLabel.textContent = "Opening Excel...";
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+                    const ok = processUploadedSheetData(json);
+                    if (!ok) {
+                        currentHeaders = [...DEFAULT_HEADERS];
+                        currentRows = [...DEFAULT_ROWS];
+                    }
+                } catch (err) {
+                    currentHeaders = [...DEFAULT_HEADERS];
+                    currentRows = [...DEFAULT_ROWS];
+                }
+
+                setTimeout(() => {
+                    openExcelViewer(file.name, true);
+                    btnLabel.textContent = "Upload Excel File";
+                }, 200);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Back button: if on Report Page, return to Main Sheet; if on Main Sheet, return to Upload Screen
+        backToUploadBtn.addEventListener('click', () => {
+            if (isReportPageActive) {
+                isReportPageActive = false;
+                updateHeaderForPageMode();
+                runWithSkeleton(() => {
+                    renderExcelGrid();
+                }, 180);
+                return;
+            }
+            fileInput.value = '';
+            excelScreen.classList.add('screen-hidden');
+            uploadScreen.classList.remove('screen-hidden');
+        });
+
+        // Initialize cloud storage on load
+        initCloudStorage();
+    </script>
+</body>
+</html>
