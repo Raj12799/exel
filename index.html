@@ -284,7 +284,7 @@
         </h1>
 
         <!-- Subtitle -->
-        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-9">
+        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-6">
             Please upload an Excel file (.xlsx, .xls) only.
         </p>
 
@@ -296,21 +296,35 @@
             class="hidden"
         />
 
-        <!-- Pill-Shaped Upload Button -->
-        <button
-            type="button"
-            onclick="document.getElementById('excelFileInput').click()"
-            class="native-btn w-full max-w-[330px] h-[60px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3.5 px-8 cursor-pointer focus:outline-none"
-        >
-            <!-- Upload Tray + Up Arrow Icon -->
-            <svg class="w-[24px] h-[24px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 15V4M12 4L7.5 8.5M12 4L16.5 8.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M4 14.5V17.5C4 18.8807 5.11929 20 6.5 20H17.5C18.8807 20 20 18.8807 20 17.5V14.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span id="btnLabel" class="text-[18px] font-semibold tracking-[-0.01em]">
-                Upload Excel File
-            </span>
-        </button>
+        <!-- Pill-Shaped Upload Button + Continue Button Container -->
+        <div class="w-full max-w-[330px] flex flex-col gap-3">
+            <button
+                type="button"
+                onclick="document.getElementById('excelFileInput').click()"
+                class="native-btn w-full h-[60px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3.5 px-8 cursor-pointer focus:outline-none"
+            >
+                <!-- Upload Tray + Up Arrow Icon -->
+                <svg class="w-[24px] h-[24px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15V4M12 4L7.5 8.5M12 4L16.5 8.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 14.5V17.5C4 18.8807 5.11929 20 6.5 20H17.5C18.8807 20 20 18.8807 20 17.5V14.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span id="btnLabel" class="text-[18px] font-semibold tracking-[-0.01em]">
+                    Upload Excel File
+                </span>
+            </button>
+
+            <!-- Continue Button (Appears if session data exists in browser) -->
+            <button
+                type="button"
+                id="continueSessionBtn"
+                class="hidden native-btn w-full h-[52px] bg-white text-[#141414] border-2 border-[#141414] rounded-full flex items-center justify-center gap-2 px-6 cursor-pointer text-sm font-bold focus:outline-none"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                <span>Continue Previous Session</span>
+            </button>
+        </div>
         </div>
 
         <!-- Compact Single-Line Notice: Private App, Terms & Conditions & Privacy Policy -->
@@ -903,6 +917,7 @@
         const excelScreen = document.getElementById('excelScreen');
         const fileInput = document.getElementById('excelFileInput');
         const btnLabel = document.getElementById('btnLabel');
+        const continueSessionBtn = document.getElementById('continueSessionBtn');
         const backToUploadBtn = document.getElementById('backToUploadBtn');
         const sheetFileName = document.getElementById('sheetFileName');
         const sheetRowCount = document.getElementById('sheetRowCount');
@@ -1026,7 +1041,6 @@
             }
         });
 
-        // Handle Help Form Submit -> Redirects to WhatsApp (9405173048) in Clean Best Format
         whatsappHelpForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const userName = helpNameInput.value.trim();
@@ -1057,11 +1071,68 @@
             window.open(waUrl, '_blank', 'noopener,noreferrer');
         });
 
-        // ==================== CHROME PWA INSTALLABILITY & CUSTOM SVG LAUNCHER LOGO ====================
-        let deferredInstallPrompt = null;
+        // ==================== LOCAL STORAGE SESSION PERSISTENCE ====================
+        function saveSessionToLocalStorage() {
+            try {
+                const sessionData = {
+                    currentHeaders,
+                    currentRows: currentRows.slice(0, 800),
+                    currentHeadingTitle,
+                    currentViewMode,
+                    isLayoutLocked,
+                    visibleHeadings: Array.from(visibleHeadings),
+                    reportSubmissions: reportSubmissions.slice(0, 400),
+                    isReportPageActive
+                };
+                localStorage.setItem('monitoring_exel_session', JSON.stringify(sessionData));
+            } catch (e) {
+                console.warn("Storage error:", e);
+            }
+        }
 
+        function loadSessionFromLocalStorage() {
+            try {
+                const raw = localStorage.getItem('monitoring_exel_session');
+                if (!raw) return false;
+                const data = JSON.parse(raw);
+                if (data && Array.isArray(data.currentHeaders) && data.currentHeaders.length > 0) {
+                    currentHeaders = data.currentHeaders;
+                    currentRows = Array.isArray(data.currentRows) ? data.currentRows : [];
+                    currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
+                    currentViewMode = data.viewMode || 'excel';
+                    isLayoutLocked = !!data.isLayoutLocked;
+                    visibleHeadings = new Set(data.visibleHeadings || DEFAULT_HEADERS);
+                    reportSubmissions = Array.isArray(data.reportSubmissions) ? data.reportSubmissions : [];
+                    isReportPageActive = !!data.isReportPageActive;
+                    return true;
+                }
+            } catch (e) {
+                console.warn("Load storage error:", e);
+            }
+            return false;
+        }
+
+        // Check on load if previous session exists
+        function checkExistingSession() {
+            if (loadSessionFromLocalStorage() && currentRows.length > 0) {
+                continueSessionBtn.classList.remove('hidden');
+            }
+        }
+
+        continueSessionBtn.addEventListener('click', () => {
+            if (loadSessionFromLocalStorage()) {
+                updateHeaderForPageMode();
+                uploadScreen.classList.add('screen-hidden');
+                excelScreen.classList.remove('screen-hidden');
+                runWithSkeleton(() => {
+                    renderExcelGrid();
+                }, 180);
+            }
+        });
+
+        // ==================== PWA INSTALL & LAUNCHER LOGO ====================
+        let deferredInstallPrompt = null;
         function setupPwaAndLauncherLogo() {
-            // Exact Same Upload Page Illustration inside App Box Icon for Chrome Install / Launcher
             const launcherSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 320" width="512" height="512">
                 <rect width="360" height="320" rx="72" fill="#ffffff"/>
                 <defs>
@@ -1130,17 +1201,6 @@
             const manifestUrl = URL.createObjectURL(manifestBlob);
             const manifestLink = document.getElementById('dynamicManifest');
             if (manifestLink) manifestLink.href = manifestUrl;
-
-            if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
-                const swCode = `
-                    self.addEventListener('install', (e) => self.skipWaiting());
-                    self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-                    self.addEventListener('fetch', (e) => {});
-                `;
-                const swBlob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(swBlob);
-                navigator.serviceWorker.register(swUrl).catch(() => {});
-            }
         }
 
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -1181,7 +1241,6 @@
             }
         }
 
-        // Smooth Skeleton Shimmer Transition Helper
         function runWithSkeleton(callback, duration = 220) {
             gridScrollContainer.classList.add('hidden');
             boxViewContainer.classList.add('hidden');
@@ -1193,7 +1252,6 @@
             }, duration);
         }
 
-        // Extract only the Date & Time stamp from the uploaded filename
         function extractDateTimeHeading(rawFileName) {
             if (!rawFileName) return '09-Nov-2026 05-44 PM';
             const base = rawFileName.replace(/\.[^/.]+$/, "");
@@ -1299,6 +1357,7 @@
 
         toggleViewModeBtn.addEventListener('click', () => {
             currentViewMode = currentViewMode === 'excel' ? 'box' : 'excel';
+            saveSessionToLocalStorage();
             runWithSkeleton(() => {
                 renderExcelGrid();
             }, 180);
@@ -1320,6 +1379,7 @@
         openReportPageBtn.addEventListener('click', () => {
             isReportPageActive = true;
             updateHeaderForPageMode();
+            saveSessionToLocalStorage();
             runWithSkeleton(() => {
                 renderExcelGrid();
             }, 220);
@@ -1500,6 +1560,7 @@
             }
 
             updateReportBadge();
+            saveSessionToLocalStorage();
             renderExcelGrid();
             closeBoxDetailDrawer();
             showToast("Saved to Report");
@@ -1922,6 +1983,7 @@
 
             isLayoutLocked = lockLayoutToggle.checked;
             mainFilterModal.classList.add('hidden');
+            saveSessionToLocalStorage();
             runWithSkeleton(() => {
                 renderExcelGrid();
             }, 180);
@@ -1942,6 +2004,7 @@
             uploadScreen.classList.add('screen-hidden');
             excelScreen.classList.remove('screen-hidden');
 
+            saveSessionToLocalStorage();
             runWithSkeleton(() => {
                 renderExcelGrid();
             }, 240);
@@ -1984,7 +2047,7 @@
             return true;
         }
 
-        // Handle New File Upload -> Preserves locked layout settings if isLayoutLocked is true
+        // Handle New File Upload
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
@@ -2003,7 +2066,6 @@
                     const prevLocked = isLayoutLocked;
                     const prevVisible = new Set(visibleHeadings);
 
-                    // Clear previous session reports for brand new file
                     reportSubmissions = [];
 
                     const ok = processUploadedSheetData(json);
@@ -2043,6 +2105,7 @@
             if (isReportPageActive) {
                 isReportPageActive = false;
                 updateHeaderForPageMode();
+                saveSessionToLocalStorage();
                 runWithSkeleton(() => {
                     renderExcelGrid();
                 }, 180);
@@ -2052,6 +2115,9 @@
             excelScreen.classList.add('screen-hidden');
             uploadScreen.classList.remove('screen-hidden');
         });
+
+        // Initialize session check on load
+        checkExistingSession();
     </script>
 </body>
 </html>
