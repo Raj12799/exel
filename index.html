@@ -166,7 +166,7 @@
             </button>
         </div>
 
-        <!-- Center Content: Illustration + Heading + Subtitle + Upload Button + Continue Button -->
+        <!-- Center Content: Illustration + Heading + Subtitle + Upload Button -->
         <div class="w-full max-w-[380px] flex flex-col items-center my-auto mx-auto">
             <!-- Ultra-Precise Vector Illustration Matching Reference Image 1:1 -->
             <div class="w-[255px] h-[245px] mb-3 flex items-center justify-center">
@@ -284,7 +284,7 @@
         </h1>
 
         <!-- Subtitle -->
-        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-6">
+        <p class="text-[15.5px] font-normal text-[#687076] leading-relaxed mb-9">
             Please upload an Excel file (.xlsx, .xls) only.
         </p>
 
@@ -300,30 +300,17 @@
         <button
             type="button"
             onclick="document.getElementById('excelFileInput').click()"
-            class="native-btn w-full max-w-[330px] h-[56px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3 px-8 cursor-pointer focus:outline-none mb-3"
+            class="native-btn w-full max-w-[330px] h-[60px] bg-[#141414] text-white rounded-full flex items-center justify-center gap-3.5 px-8 cursor-pointer focus:outline-none"
         >
             <!-- Upload Tray + Up Arrow Icon -->
-            <svg class="w-[22px] h-[22px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="w-[24px] h-[24px] text-white shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 15V4M12 4L7.5 8.5M12 4L16.5 8.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M4 14.5V17.5C4 18.8807 5.11929 20 6.5 20H17.5C18.8807 20 20 18.8807 20 17.5V14.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span id="btnLabel" class="text-[17px] font-semibold tracking-[-0.01em]">
+            <span id="btnLabel" class="text-[18px] font-semibold tracking-[-0.01em]">
                 Upload Excel File
             </span>
         </button>
-
-        <!-- Continue Button (Appears if active sheet/session exists) -->
-        <button
-            type="button"
-            id="continueSessionBtn"
-            class="hidden native-btn w-full max-w-[330px] h-[50px] bg-slate-100 text-slate-900 border border-slate-200 rounded-full flex items-center justify-center gap-2.5 px-6 font-bold text-sm"
-        >
-            <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-            </svg>
-            <span>Continue Existing Session</span>
-        </button>
-
         </div>
 
         <!-- Compact Single-Line Notice: Private App, Terms & Conditions & Privacy Policy -->
@@ -914,14 +901,12 @@
         let activeDrawerRow = null;
         let reportSubmissions = [];
         let isReportPageActive = false;
-        let hasActiveLoadedSession = false;
 
         // DOM Elements
         const uploadScreen = document.getElementById('uploadScreen');
         const excelScreen = document.getElementById('excelScreen');
         const fileInput = document.getElementById('excelFileInput');
         const btnLabel = document.getElementById('btnLabel');
-        const continueSessionBtn = document.getElementById('continueSessionBtn');
         const backToUploadBtn = document.getElementById('backToUploadBtn');
         const sheetFileName = document.getElementById('sheetFileName');
         const sheetRowCount = document.getElementById('sheetRowCount');
@@ -1181,7 +1166,7 @@
 
         setupPwaAndLauncherLogo();
 
-        // ==================== LOCALSTORAGE & CLOUD PERSISTENCE ====================
+        // ==================== FIREBASE CLOUD PERSISTENCE ====================
         let db = null;
         let currentUser = null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-excel-app';
@@ -1217,79 +1202,7 @@
             }, duration);
         }
 
-        function saveLocalState(hasOpenSheet = true) {
-            try {
-                const serializableVF = {};
-                Object.keys(valueFilters).forEach(k => {
-                    serializableVF[k] = Array.from(valueFilters[k]);
-                });
-
-                const payload = {
-                    hasOpenSheet,
-                    headingTitle: currentHeadingTitle,
-                    viewMode: currentViewMode,
-                    isLayoutLocked,
-                    visibleHeadings: Array.from(visibleHeadings),
-                    valueFilters: serializableVF,
-                    headers: currentHeaders,
-                    rows: currentRows.slice(0, 800),
-                    reports: reportSubmissions.slice(0, 400),
-                    updatedAt: Date.now()
-                };
-                localStorage.setItem('monitoring_exel_session', JSON.stringify(payload));
-            } catch (e) {
-                console.warn("Local storage save error:", e);
-            }
-        }
-
-        function loadLocalState() {
-            try {
-                const raw = localStorage.getItem('monitoring_exel_session');
-                if (!raw) return false;
-                const data = JSON.parse(raw);
-                if (data && data.hasOpenSheet && Array.isArray(data.headers) && data.headers.length > 0) {
-                    currentHeaders = data.headers;
-                    currentRows = Array.isArray(data.rows) ? data.rows : [];
-                    currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
-                    currentViewMode = data.viewMode || 'excel';
-                    isLayoutLocked = !!data.isLayoutLocked;
-
-                    if (isLayoutLocked && Array.isArray(data.visibleHeadings)) {
-                        visibleHeadings = new Set(data.visibleHeadings);
-                        visibleHeadings.add("Terminal ID");
-                    } else {
-                        visibleHeadings = new Set(currentHeaders);
-                    }
-
-                    if (data.valueFilters) {
-                        valueFilters = {};
-                        Object.keys(data.valueFilters).forEach(k => {
-                            valueFilters[k] = new Set(data.valueFilters[k]);
-                        });
-                    }
-
-                    if (Array.isArray(data.reports)) {
-                        reportSubmissions = data.reports;
-                        updateReportBadge();
-                    }
-
-                    hasActiveLoadedSession = true;
-                    continueSessionBtn.classList.remove('hidden');
-
-                    // Automatically restore Excel Viewer directly on refresh without forcing upload screen
-                    openExcelViewer(currentHeadingTitle, false);
-                    return true;
-                }
-            } catch (e) {
-                console.warn("Local storage load error:", e);
-            }
-            return false;
-        }
-
         async function initCloudStorage() {
-            // First load instantly from localStorage so data and active sheet view persist across refreshes
-            const loadedLocally = loadLocalState();
-
             try {
                 if (typeof __firebase_config === 'undefined' || !__firebase_config) return;
                 const firebaseConfig = JSON.parse(__firebase_config);
@@ -1304,49 +1217,12 @@
                 }
                 currentUser = auth.currentUser;
                 if (!currentUser) return;
-
-                const stateDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'excel_viewer_state', 'active_session');
-                const snap = await getDoc(stateDocRef);
-                if (snap.exists()) {
-                    const data = snap.data();
-                    if (data.hasOpenSheet && data.headersJson && data.rowsJson) {
-                        const savedHeaders = JSON.parse(data.headersJson);
-                        const savedRows = JSON.parse(data.rowsJson);
-                        if (Array.isArray(savedHeaders) && savedHeaders.length > 0 && !loadedLocally) {
-                            currentHeaders = savedHeaders;
-                            currentRows = Array.isArray(savedRows) ? savedRows : [];
-                            currentHeadingTitle = data.headingTitle || "09-Nov-2026 05-44 PM";
-                            isLayoutLocked = !!data.isLayoutLocked;
-                            if (isLayoutLocked && data.visibleHeadingsJson) {
-                                const parsedVis = JSON.parse(data.visibleHeadingsJson);
-                                if (Array.isArray(parsedVis)) {
-                                    visibleHeadings = new Set(parsedVis);
-                                    visibleHeadings.add("Terminal ID");
-                                }
-                            } else {
-                                visibleHeadings = new Set(currentHeaders);
-                            }
-                            if (data.reportSubmissionsJson) {
-                                const parsedRep = JSON.parse(data.reportSubmissionsJson);
-                                if (Array.isArray(parsedRep)) {
-                                    reportSubmissions = parsedRep;
-                                    updateReportBadge();
-                                }
-                            }
-                            hasActiveLoadedSession = true;
-                            continueSessionBtn.classList.remove('hidden');
-                            saveLocalState(true);
-                            openExcelViewer(currentHeadingTitle, false);
-                        }
-                    }
-                }
             } catch (e) {
                 console.warn("Cloud state sync skipped:", e);
             }
         }
 
         async function saveStateToCloud(hasOpenSheet = true) {
-            saveLocalState(hasOpenSheet);
             if (!db || !currentUser) return;
             try {
                 const serializableVF = {};
@@ -2135,11 +2011,6 @@
             }, 240);
         }
 
-        // Continue Button Handler
-        continueSessionBtn.addEventListener('click', () => {
-            openExcelViewer(currentHeadingTitle, false);
-        });
-
         function processUploadedSheetData(rawRows) {
             if (!rawRows || !rawRows.length) return false;
 
@@ -2225,8 +2096,6 @@
                 }
 
                 setTimeout(() => {
-                    hasActiveLoadedSession = true;
-                    continueSessionBtn.classList.remove('hidden');
                     openExcelViewer(file.name, true);
                     btnLabel.textContent = "Upload Excel File";
                 }, 200);
