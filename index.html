@@ -817,10 +817,6 @@
     <textarea id="clipboardHelper" class="fixed -top-96 -left-96 opacity-0 pointer-events-none"></textarea>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
         // Exact 39 Headings (with the 2 blank columns removed)
         const DEFAULT_HEADERS = [
             "Terminal ID",
@@ -1166,11 +1162,6 @@
 
         setupPwaAndLauncherLogo();
 
-        // ==================== FIREBASE CLOUD PERSISTENCE ====================
-        let db = null;
-        let currentUser = null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-excel-app';
-
         function showToast(msg) {
             toastBanner.textContent = msg;
             toastBanner.classList.remove('hidden');
@@ -1202,54 +1193,6 @@
             }, duration);
         }
 
-        async function initCloudStorage() {
-            try {
-                if (typeof __firebase_config === 'undefined' || !__firebase_config) return;
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
-                db = getFirestore(app);
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                currentUser = auth.currentUser;
-                if (!currentUser) return;
-            } catch (e) {
-                console.warn("Cloud state sync skipped:", e);
-            }
-        }
-
-        async function saveStateToCloud(hasOpenSheet = true) {
-            if (!db || !currentUser) return;
-            try {
-                const serializableVF = {};
-                Object.keys(valueFilters).forEach(k => {
-                    serializableVF[k] = Array.from(valueFilters[k]);
-                });
-
-                const rowsToSave = currentRows.slice(0, 600);
-
-                const stateDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'excel_viewer_state', 'active_session');
-                await setDoc(stateDocRef, {
-                    hasOpenSheet,
-                    headingTitle: currentHeadingTitle,
-                    viewMode: currentViewMode,
-                    isLayoutLocked,
-                    visibleHeadingsJson: JSON.stringify(Array.from(visibleHeadings)),
-                    valueFiltersJson: JSON.stringify(serializableVF),
-                    headersJson: JSON.stringify(currentHeaders),
-                    rowsJson: JSON.stringify(rowsToSave),
-                    reportSubmissionsJson: JSON.stringify(reportSubmissions.slice(0, 300)),
-                    updatedAt: Date.now()
-                });
-            } catch (e) {
-                console.warn("Save cloud state error:", e);
-            }
-        }
-
         // Extract only the Date & Time stamp from the uploaded filename
         function extractDateTimeHeading(rawFileName) {
             if (!rawFileName) return '09-Nov-2026 05-44 PM';
@@ -1270,7 +1213,6 @@
             if (isReportPageActive) {
                 return reportSubmissions.map(item => item.row);
             }
-            // Filter out already submitted ATMs from the main list so they don't appear in active view
             const submittedTids = new Set(reportSubmissions.map(item => item.terminalId));
             const tidIdx = findColIndex("Terminal ID");
 
@@ -1359,7 +1301,6 @@
             currentViewMode = currentViewMode === 'excel' ? 'box' : 'excel';
             runWithSkeleton(() => {
                 renderExcelGrid();
-                saveStateToCloud(true);
             }, 180);
         });
 
@@ -1560,7 +1501,6 @@
 
             updateReportBadge();
             renderExcelGrid();
-            saveStateToCloud(true);
             closeBoxDetailDrawer();
             showToast("Saved to Report");
         }
@@ -1984,11 +1924,10 @@
             mainFilterModal.classList.add('hidden');
             runWithSkeleton(() => {
                 renderExcelGrid();
-                saveStateToCloud(true);
             }, 180);
         });
 
-        function openExcelViewer(fileNameOrHeading, shouldSave = true) {
+        function openExcelViewer(fileNameOrHeading) {
             currentHeadingTitle = extractDateTimeHeading(fileNameOrHeading);
             isReportPageActive = false;
             updateHeaderForPageMode();
@@ -2005,9 +1944,6 @@
 
             runWithSkeleton(() => {
                 renderExcelGrid();
-                if (shouldSave) {
-                    saveStateToCloud(true);
-                }
             }, 240);
         }
 
@@ -2096,7 +2032,7 @@
                 }
 
                 setTimeout(() => {
-                    openExcelViewer(file.name, true);
+                    openExcelViewer(file.name);
                     btnLabel.textContent = "Upload Excel File";
                 }, 200);
             };
@@ -2116,9 +2052,6 @@
             excelScreen.classList.add('screen-hidden');
             uploadScreen.classList.remove('screen-hidden');
         });
-
-        // Initialize session on load
-        initCloudStorage();
     </script>
 </body>
 </html>
