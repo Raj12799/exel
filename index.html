@@ -14,7 +14,7 @@
     <link id="dynamicManifest" rel="manifest" href="">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load SheetJS for real .xlsx / .xls / older .xls parsing & export -->
+    <!-- Load SheetJS (full build with legacy .xls support via cfx) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Load jsPDF & AutoTable for PDF Report Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -2660,7 +2660,8 @@
             reader.onload = function(evt) {
                 try {
                     const data = new Uint8Array(evt.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    // Support legacy binary .xls workbook formats robustly by parsing array buffer
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true, cellNF: true, cellText: false });
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
