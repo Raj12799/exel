@@ -747,7 +747,7 @@
                 </div>
 
                 <!-- Export Actions -->
-                <div class="p-3 bg-slate-50 border-t border-slate-200 grid grid-cols-3 gap-2 shrink-0">
+                <div class="p-3 bg-slate-50 border-t border-slate-200 grid grid-cols-4 gap-2 shrink-0">
                     <button id="sharePdfBtn" type="button" class="native-btn flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">
                         <div class="w-7 h-7 rounded bg-red-50 text-red-600 flex items-center justify-center font-bold text-[10px]">PDF</div>
                         <span class="text-[10px] font-bold">Export</span>
@@ -759,6 +759,10 @@
                     <button id="shareCopyFormatBtn" type="button" class="native-btn flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">
                         <div class="w-7 h-7 rounded bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[10px]">TXT</div>
                         <span class="text-[10px] font-bold">Copy</span>
+                    </button>
+                    <button id="shareWhatsAppAlertBtn" type="button" class="native-btn flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">
+                        <div class="w-7 h-7 rounded bg-[#dcfce3] text-[#166534] flex items-center justify-center font-bold text-[10px]">WA</div>
+                        <span class="text-[10px] font-bold">Alert</span>
                     </button>
                 </div>
             </div>
@@ -1053,6 +1057,7 @@
         const sharePdfBtn = document.getElementById('sharePdfBtn');
         const shareExcelBtn = document.getElementById('shareExcelBtn');
         const shareCopyFormatBtn = document.getElementById('shareCopyFormatBtn');
+        const shareWhatsAppAlertBtn = document.getElementById('shareWhatsAppAlertBtn');
 
         const toastBanner = document.getElementById('toastBanner');
         const mainFilterModal = document.getElementById('mainFilterModal');
@@ -2034,6 +2039,60 @@
             } catch (err) {
                 showToast("Copy completed");
             }
+            shareSelectionModal.classList.add('hidden');
+        });
+
+        // WhatsApp Custom Alert Share
+        shareWhatsAppAlertBtn.addEventListener('click', () => {
+            const rowsToShare = getRowsForExport();
+            if (rowsToShare.length === 0) {
+                showToast("No records to share");
+                return;
+            }
+
+            const tidIdx = findColIndex("Terminal ID");
+            const locIdx = findColIndex("Location");
+            const typeIdx = findColIndex("Machine Type");
+            const ageIdx = findColIndex("Age");
+
+            const machineLines = rowsToShare.map(row => {
+                const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
+                const loc = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim().toUpperCase() : 'UNKNOWN';
+                
+                let mType = typeIdx !== -1 && row[typeIdx] ? String(row[typeIdx]).trim().toUpperCase() : 'ATM';
+                if (!mType) mType = 'ATM';
+
+                // Extract only numbers for the hours to ensure clean formatting (e.g. "10 Hrs" -> "10")
+                let ageStr = ageIdx !== -1 && row[ageIdx] ? String(row[ageIdx]).trim() : 'N/A';
+                const ageMatch = ageStr.match(/\d+(\.\d+)?/);
+                if (ageMatch) {
+                    ageStr = ageMatch[0];
+                }
+
+                // Get last 3 digits of TID safely
+                const tidLast3 = tid.length >= 3 ? tid.slice(-3) : tid;
+
+                // Example: 🟣 *_GANGAPUR RD BR ATM 003(DOWN 10 HOUR'S)_*
+                return `🟣 *_${loc} ${mType} ${tidLast3}(DOWN ${ageStr} HOUR'S)_*`;
+            });
+
+            const textHeader = "Madam/Sir\n*Atm/Adwm*\n\n";
+            const textFooter = "\n\nTeam Members of the above mentioned branches are kindly requested to please  attend the machines and make them operational as early as possible.\n\nRegards";
+            
+            const finalMessage = textHeader + machineLines.join('\n\n') + textFooter;
+
+            // Copy to clipboard just in case
+            clipboardHelper.value = finalMessage;
+            clipboardHelper.select();
+            try {
+                document.execCommand('copy');
+                showToast("WhatsApp Alert Copied!");
+            } catch (err) {}
+
+            // Open WhatsApp redirect
+            const waUrl = `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
+            window.open(waUrl, '_blank', 'noopener,noreferrer');
+            
             shareSelectionModal.classList.add('hidden');
         });
 
