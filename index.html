@@ -14,7 +14,7 @@
     <link id="dynamicManifest" rel="manifest" href="">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load SheetJS for real .xlsx / .xls parsing & export -->
+    <!-- Load SheetJS for real .xlsx / .xls / older .xls parsing & export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Load jsPDF & AutoTable for PDF Report Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -260,11 +260,11 @@
             Please upload an Excel file (.xlsx, .xls) only.
         </p>
 
-        <!-- Hidden Native File Input -->
+        <!-- Hidden Native File Input (Universal Excel & CSV Support) -->
         <input
             type="file"
             id="excelFileInput"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            accept=".xlsx,.xls,.xlsb,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/xml,application/xml,text/plain"
             class="hidden"
         />
 
@@ -563,8 +563,8 @@
                     <span id="reportCountBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#141414] text-white text-[10px] font-bold rounded-full flex items-center justify-center">0</span>
                 </button>
 
-                <!-- Share Button (Visible only in Report View) -->
-                <button id="openShareReportModalBtn" type="button" class="hidden p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Share Report (PDF, Excel, Copy)">
+                <!-- General Share / Report Share Button -->
+                <button id="openShareReportModalBtn" type="button" class="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-800 transition flex items-center justify-center" title="Share (PDF, Excel, Copy, WA Alert)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
@@ -898,7 +898,7 @@
     <textarea id="clipboardHelper" class="fixed -top-96 -left-96 opacity-0 pointer-events-none"></textarea>
 
     <script type="module">
-        // Exact 39 Headings (with the 2 blank columns removed)
+        // Default Headings
         const DEFAULT_HEADERS = [
             "Terminal ID",
             "Location",
@@ -987,7 +987,7 @@
         // Share Selection State
         let isShareSelectionLocked = false;
         let lockedShareFields = ['Terminal ID', 'Location', 'Errors', 'Remark/Solution'];
-        let activeShareContext = 'report'; // 'report' or 'drawer'
+        let activeShareContext = 'report'; // 'report', 'drawer', or 'table'
 
         // Active Column Filter Modal State
         let activeColumnFilterHeader = null;
@@ -1287,13 +1287,11 @@
 
             const fullPayload = buildSessionPayload();
 
-            // Save full dataset to IndexedDB (handles large Excel files without 5MB quota failure)
             openSessionDB().then(db => {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 tx.objectStore(STORE_NAME).put(fullPayload, SESSION_KEY);
             }).catch(() => {});
 
-            // Also save to localStorage with automatic row-limit fallback if quota exceeded
             try {
                 localStorage.setItem(SESSION_KEY, JSON.stringify(fullPayload));
             } catch (e) {
@@ -1311,7 +1309,6 @@
         }
 
         async function loadSessionAsync() {
-            // Try IndexedDB first for complete un-truncated Excel rows
             try {
                 const db = await openSessionDB();
                 const idbData = await new Promise((resolve, reject) => {
@@ -1325,7 +1322,6 @@
                 }
             } catch (e) {}
 
-            // Fallback to localStorage
             try {
                 const raw = localStorage.getItem(SESSION_KEY);
                 if (!raw) return false;
@@ -1348,7 +1344,7 @@
         }
 
         // ==================== REFRESH CONFIRMATION POPUP ====================
-        let refreshModalMode = 'restore'; // 'restore' on page load, 'reload' when pressing F5/Ctrl+R
+        let refreshModalMode = 'restore';
 
         function openRefreshConfirmationPopup(mode) {
             refreshModalMode = mode;
@@ -1366,7 +1362,6 @@
             refreshConfirmModal.classList.remove('hidden');
         }
 
-        // Intercept keyboard F5 or Ctrl+R / Cmd+R to show custom Refresh Confirmation Popup
         window.addEventListener('keydown', (e) => {
             if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
                 if (currentRows && currentRows.length > 0) {
@@ -1376,7 +1371,6 @@
             }
         });
 
-        // Native browser refresh/close confirmation when session is active
         window.addEventListener('beforeunload', (e) => {
             if (currentRows && currentRows.length > 0) {
                 saveSessionToLocalStorage();
@@ -1566,17 +1560,6 @@
             return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         }
 
-        function hasActiveFilters() {
-            const anyHeadingHidden = currentHeaders.some(h => !visibleHeadings.has(h));
-            const anyValueFiltered = Object.keys(valueFilters).some(h => {
-                const colIdx = currentHeaders.indexOf(h);
-                if (colIdx === -1) return false;
-                const allVals = getUniqueColumnValues(colIdx);
-                return valueFilters[h] && valueFilters[h].size < allVals.length;
-            });
-            return anyHeadingHidden || anyValueFiltered;
-        }
-
         function findColIndex(targetName) {
             const norm = targetName.trim().toLowerCase();
             return currentHeaders.findIndex(h => String(h || '').trim().toLowerCase() === norm);
@@ -1614,7 +1597,6 @@
             return found ? found.input : '';
         }
 
-        // Highlight Helper
         function getHighlightedText(text, q) {
             if (!q || text === undefined || text === null) return text !== undefined ? text : '';
             const str = String(text);
@@ -1647,7 +1629,6 @@
             }, 180);
         });
 
-        // Search Handlers
         toggleSearchBtn.addEventListener('click', () => {
             const isActive = searchBarContainer.classList.contains('active');
             if (isActive) {
@@ -1683,18 +1664,19 @@
         function updateHeaderForPageMode() {
             if (isReportPageActive) {
                 sheetFileName.textContent = "Report";
-                openReportPageBtn.classList.add('hidden');
-                openShareReportModalBtn.classList.remove('hidden');
             } else {
                 sheetFileName.textContent = currentHeadingTitle;
-                openShareReportModalBtn.classList.add('hidden');
-                openReportPageBtn.classList.remove('hidden');
             }
             updateReportBadge();
         }
 
         openReportPageBtn.addEventListener('click', () => {
-            isReportPageActive = true;
+            isReportPageActive = !isReportPageActive;
+            if (isReportPageActive) {
+                openReportPageBtn.classList.add('bg-slate-100');
+            } else {
+                openReportPageBtn.classList.remove('bg-slate-100');
+            }
             updateHeaderForPageMode();
             saveSessionToLocalStorage();
             runWithSkeleton(() => {
@@ -1923,17 +1905,20 @@
 
         // ==================== ADVANCED SHARE MODAL (COLUMNS SELECTION) ====================
         function openShareModal(context) {
-            activeShareContext = context; // 'report' or 'drawer'
+            activeShareContext = context; // 'report', 'drawer', or 'table'
             
-            if (context === 'report' && lastFilteredRows.length === 0) {
-                showToast("No report records to export");
+            if (context === 'report' && reportSubmissions.length === 0) {
+                showToast("No submitted report records yet");
+                return;
+            }
+            if (context === 'table' && lastFilteredRows.length === 0) {
+                showToast("No table records to share");
                 return;
             }
             if (context === 'drawer' && !activeDrawerRow) {
                 return;
             }
 
-            // Define Available Fields
             const availableFields = new Set(['Terminal ID', 'Location', 'Errors', 'Remark/Solution']);
             currentHeaders.forEach(h => {
                 if (visibleHeadings.has(h)) {
@@ -1941,14 +1926,12 @@
                 }
             });
 
-            // If not locked, default to the 4 main ones
             if (!isShareSelectionLocked) {
                 lockedShareFields = ['Terminal ID', 'Location', 'Errors', 'Remark/Solution'];
             }
             
             lockShareSelectionToggle.checked = isShareSelectionLocked;
 
-            // Render Checkboxes
             let html = '';
             availableFields.forEach(f => {
                 const isChecked = lockedShareFields.includes(f) ? 'checked' : '';
@@ -1965,7 +1948,14 @@
         }
 
         drawerShareBtn.addEventListener('click', () => openShareModal('drawer'));
-        openShareReportModalBtn.addEventListener('click', () => openShareModal('report'));
+        
+        openShareReportModalBtn.addEventListener('click', () => {
+            if (isReportPageActive) {
+                openShareModal('report');
+            } else {
+                openShareModal('table');
+            }
+        });
         
         closeShareSelectionModalBtn.addEventListener('click', () => {
             shareSelectionModal.classList.add('hidden');
@@ -1986,10 +1976,12 @@
             return selected;
         }
 
-        // Export Actions inside Share Modal
         function getRowsForExport() {
             if (activeShareContext === 'drawer') {
                 return activeDrawerRow ? [activeDrawerRow] : [];
+            }
+            if (activeShareContext === 'report') {
+                return reportSubmissions.map(item => item.row);
             }
             return lastFilteredRows;
         }
@@ -2007,7 +1999,7 @@
             const blocks = rowsToShare.map((row, idx) => {
                 const num = String(idx + 1).padStart(2, '0');
                 const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
-                let text = activeShareContext === 'report' ? `${num}.` : `•`;
+                let text = (activeShareContext === 'report' || activeShareContext === 'table') ? `${num}.` : `•`;
 
                 selectedFields.forEach(field => {
                     let val = '';
@@ -2042,7 +2034,6 @@
             shareSelectionModal.classList.add('hidden');
         });
 
-        // WhatsApp Custom Alert Share
         shareWhatsAppAlertBtn.addEventListener('click', () => {
             const rowsToShare = getRowsForExport();
             if (rowsToShare.length === 0) {
@@ -2059,20 +2050,21 @@
                 const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
                 const loc = locIdx !== -1 && row[locIdx] ? String(row[locIdx]).trim().toUpperCase() : 'UNKNOWN';
                 
-                let mType = typeIdx !== -1 && row[typeIdx] ? String(row[typeIdx]).trim().toUpperCase() : 'ATM';
-                if (!mType) mType = 'ATM';
+                let rawType = typeIdx !== -1 && row[typeIdx] ? String(row[typeIdx]).trim().toUpperCase() : '';
+                let mType = 'ATM';
+                if (rawType.includes('ADWM') || rawType.includes('CRM') || rawType.includes('RECYCLER') || rawType.includes('BNA')) {
+                    mType = 'ADWM';
+                } else {
+                    mType = 'ATM';
+                }
 
-                // Extract only numbers for the hours to ensure clean formatting (e.g. "10 Hrs" -> "10")
                 let ageStr = ageIdx !== -1 && row[ageIdx] ? String(row[ageIdx]).trim() : 'N/A';
                 const ageMatch = ageStr.match(/\d+(\.\d+)?/);
                 if (ageMatch) {
                     ageStr = ageMatch[0];
                 }
 
-                // Get last 3 digits of TID safely
                 const tidLast3 = tid.length >= 3 ? tid.slice(-3) : tid;
-
-                // Example: 🟣 *_GANGAPUR RD BR ATM 003(DOWN 10 HOUR'S)_*
                 return `🟣 *_${loc} ${mType} ${tidLast3}(DOWN ${ageStr} HOUR'S)_*`;
             });
 
@@ -2081,7 +2073,6 @@
             
             const finalMessage = textHeader + machineLines.join('\n\n') + textFooter;
 
-            // Copy to clipboard just in case
             clipboardHelper.value = finalMessage;
             clipboardHelper.select();
             try {
@@ -2089,7 +2080,6 @@
                 showToast("WhatsApp Alert Copied!");
             } catch (err) {}
 
-            // Open WhatsApp redirect
             const waUrl = `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
             window.open(waUrl, '_blank', 'noopener,noreferrer');
             
@@ -2131,7 +2121,7 @@
             const ws = XLSX.utils.aoa_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Export");
-            const prefix = activeShareContext === 'drawer' ? 'ATM_Details' : 'ATM_Report';
+            const prefix = activeShareContext === 'drawer' ? 'ATM_Details' : (activeShareContext === 'report' ? 'ATM_Report' : 'ATM_Table');
             XLSX.writeFile(wb, `${prefix}_${currentHeadingTitle.replace(/[:/\s]+/g, '_')}.xlsx`);
             shareSelectionModal.classList.add('hidden');
             showToast("Excel Downloaded");
@@ -2151,7 +2141,7 @@
                 const { jsPDF } = window.jspdf;
                 const docPdf = new jsPDF();
 
-                const prefix = activeShareContext === 'drawer' ? 'ATM Details' : 'ATM Report';
+                const prefix = activeShareContext === 'drawer' ? 'ATM Details' : (activeShareContext === 'report' ? 'ATM Report' : 'ATM Table View');
                 docPdf.setFontSize(13);
                 docPdf.text(`${prefix} - ${currentHeadingTitle}`, 14, 15);
 
@@ -2181,7 +2171,7 @@
                     headStyles: { fillColor: [20, 20, 20] }
                 });
 
-                docPdf.save(`${prefix.replace(' ', '_')}_${currentHeadingTitle.replace(/[:/\s]+/g, '_')}.pdf`);
+                docPdf.save(`${prefix.replace(/\s+/g, '_')}_${currentHeadingTitle.replace(/[:/\s]+/g, '_')}.pdf`);
                 showToast("PDF Downloaded");
             } catch (e) {
                 console.warn("PDF generation error:", e);
@@ -2277,7 +2267,6 @@
             renderExcelGrid();
         });
 
-        // Click on filter icon in table header cell
         excelThead.addEventListener('click', (e) => {
             const filterBtn = e.target.closest('.col-header-filter-btn');
             if (!filterBtn) return;
@@ -2299,7 +2288,6 @@
                 }
             });
 
-            // 1. Column Filtering
             let filteredRows = baseRows.filter(row => {
                 for (let c = 0; c < currentHeaders.length; c++) {
                     const hName = currentHeaders[c];
@@ -2315,18 +2303,15 @@
                 return true;
             });
 
-            // 2. Global Text Searching
             const q = globalSearchQuery.trim();
             if (q) {
                 const qLower = q.toLowerCase();
                 const tidIdx = findColIndex("Terminal ID");
                 filteredRows = filteredRows.filter(row => {
-                    // check visible columns
                     for(let col of visibleCols) {
                         const val = row[col.index];
                         if (val && String(val).toLowerCase().includes(qLower)) return true;
                     }
-                    // check remark in report mode
                     if (isReportPageActive) {
                         const tid = tidIdx !== -1 && row[tidIdx] ? String(row[tidIdx]).trim() : '';
                         const remark = getSavedInputForTerminal(tid);
@@ -2603,10 +2588,10 @@
         function openExcelViewer(fileNameOrHeading) {
             currentHeadingTitle = extractDateTimeHeading(fileNameOrHeading);
             isReportPageActive = false;
+            openReportPageBtn.classList.remove('bg-slate-100');
             activePage = 'excel';
             updateHeaderForPageMode();
             
-            // reset search
             globalSearchInput.value = '';
             globalSearchQuery = '';
             clearSearchBtn.classList.add('hidden');
@@ -2692,6 +2677,7 @@
                     if (!ok) {
                         currentHeaders = [...DEFAULT_HEADERS];
                         currentRows = [...DEFAULT_ROWS];
+                        setTimeout(() => showToast("Invalid Excel format or columns not found"), 300);
                     }
 
                     if (prevLocked) {
@@ -2716,8 +2702,10 @@
                     }
 
                 } catch (err) {
+                    console.error("Reader error:", err);
                     currentHeaders = [...DEFAULT_HEADERS];
                     currentRows = [...DEFAULT_ROWS];
+                    setTimeout(() => showToast("Error reading Excel file"), 300);
                 }
 
                 setTimeout(() => {
@@ -2753,6 +2741,7 @@
         backToUploadBtn.addEventListener('click', () => {
             if (isReportPageActive) {
                 isReportPageActive = false;
+                openReportPageBtn.classList.remove('bg-slate-100');
                 updateHeaderForPageMode();
                 saveSessionToLocalStorage();
                 runWithSkeleton(() => {
@@ -2770,7 +2759,6 @@
             saveSessionToLocalStorage();
         });
 
-        // Initialize Session Check on Load with Refresh Confirmation Popup
         async function checkExistingSession() {
             const hasData = await loadSessionAsync();
             hideAllScreens();
@@ -2782,7 +2770,6 @@
 
         refreshDiscardBtn.addEventListener('click', () => {
             if (refreshModalMode === 'reload') {
-                // User chose not to refresh page
                 refreshConfirmModal.classList.add('hidden');
                 return;
             }
@@ -2806,7 +2793,6 @@
             restoreSessionAndOpenViewer();
         });
 
-        // Run check on start
         checkExistingSession();
     </script>
 </body>
